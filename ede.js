@@ -4635,8 +4635,8 @@
                 slider.dispatchEvent(e);
             });
         }
-        if (OS.isEmbyTheater()) {
-            // 以下兼容旧版本emby,控制器操作锁定滑块焦点
+        {
+            // 控制器操作锁定滑块焦点,防止方向键触发空间导航跳转焦点
             slider.addEventListener('keydown', e => {
                 const orient = slider.getAttribute('orient') || 'horizontal';
                 if ((orient === 'horizontal' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) ||
