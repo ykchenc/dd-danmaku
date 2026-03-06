@@ -1,3 +1,4 @@
+globalThis.__EDE_BUILD_PROFILE__ = 'lite-v1';
 // ==UserScript==
 // @name         Emby danmaku extension - Emby style
 // @description  Emby弹幕插件 - Emby风格

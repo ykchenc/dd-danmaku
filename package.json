@@ -1,40 +1,42 @@
 {
-  "name": "dd-danmaku",
-  "version": "1.0.0",
-  "description": "![截图](https://raw.githubusercontent.com/chen3861229/dd-danmaku/main/img/newui01.png)",
-  "main": "cf_worker.js",
-  "directories": {
-    "doc": "docs"
-  },
-  "dependencies": {},
-  "devDependencies": {
-    "@babel/cli": "^7.28.6",
-    "@babel/core": "^7.28.6",
-    "@babel/preset-env": "^7.28.6",
-    "cross-env": "^10.1.0"
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build:android9": "cross-env BROWSERSLIST_ENV=android9 babel ede.js --out-file dist/ede.android9.js",
-    "build:android7": "cross-env BROWSERSLIST_ENV=android7 babel ede.js --out-file dist/ede.android7.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/chen3861229/dd-danmaku.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/chen3861229/dd-danmaku/issues"
-  },
-  "homepage": "https://github.com/chen3861229/dd-danmaku#readme",
-  "browserslist": {
-    "android9": [
-      "Android >= 9"
-    ],
-    "android7": [
-      "Android >= 7"
-    ]
-  }
+    "name": "dd-danmaku",
+    "version": "1.0.0",
+    "description": "![截图](https://raw.githubusercontent.com/chen3861229/dd-danmaku/main/img/newui01.png)",
+    "main": "cf_worker.js",
+    "directories": {
+        "doc": "docs"
+    },
+    "dependencies": {},
+    "devDependencies": {
+        "@babel/cli": "^7.28.6",
+        "@babel/core": "^7.28.6",
+        "@babel/preset-env": "^7.28.6",
+        "cross-env": "^10.1.0"
+    },
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "build:android9": "cross-env BROWSERSLIST_ENV=android9 babel ede.js --out-file dist/ede.android9.js",
+        "build:android7": "cross-env BROWSERSLIST_ENV=android7 babel ede.js --out-file dist/ede.android7.js",
+        "build:lite-v1:prepare": "node scripts/generate-lite-v1.mjs",
+        "build:lite-v1:android9": "npm run build:lite-v1:prepare && cross-env BROWSERSLIST_ENV=android9 babel ede.lite-v1.js --out-file dist/ede.lite-v1.android9.js"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/chen3861229/dd-danmaku.git"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/chen3861229/dd-danmaku/issues"
+    },
+    "homepage": "https://github.com/chen3861229/dd-danmaku#readme",
+    "browserslist": {
+        "android9": [
+            "Android >= 9"
+        ],
+        "android7": [
+            "Android >= 7"
+        ]
+    }
 }

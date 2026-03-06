@@ -167,6 +167,25 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
   var mediaContainerQueryStr = '.graphicContentContainer';
   var notHide = ':not(.hide)';
   var mediaQueryStr = 'video';
+  var buildProfile = globalThis.__EDE_BUILD_PROFILE__ || 'full';
+  var isLiteV1 = buildProfile === 'lite-v1';
+  var featureFlags = {
+    enableHashMatch: !isLiteV1,
+    // O01 + O02
+    enableAppLogAspect: !isLiteV1,
+    // O03
+    enableDanmakuInfoTab: !isLiteV1,
+    // O12
+    enableBangumiCharacters: !isLiteV1,
+    // O13
+    enableOsdLineChart: !isLiteV1,
+    // O16
+    enableMergeSimilar: !isLiteV1,
+    // O06
+    enableFontCustomization: !isLiteV1,
+    // O08
+    enableConsoleLogViewer: !isLiteV1 // O21
+  };
 
   // https://fonts.google.com/icons
   var iconKeys = {
@@ -227,7 +246,9 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
     name: '内嵌网页',
     hidden: true,
     buildMethod: buildIframe
-  }];
+  }].filter(function (tab) {
+    return featureFlags.enableDanmakuInfoTab || tab.id !== currentDanmakuInfoContainerId;
+  });
   // 弹幕类型过滤
   var danmakuTypeFilterOpts = {
     bottom: {
@@ -1682,7 +1703,7 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
   }
   function onVideoOsdShow(e) {
     console.log(e.type, e);
-    if (lsGetItem(lsKeys.osdLineChartEnable.id)) {
+    if (featureFlags.enableOsdLineChart && lsGetItem(lsKeys.osdLineChartEnable.id)) {
       buildProgressBarChart(20);
     }
     if (lsGetItem(lsKeys.osdHeaderClockEnable.id)) {
@@ -2654,9 +2675,11 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
     }
 
     // 尝试哈希匹配(含 /match 调用)
-    var hashMatchResult = await tryMatchByHash(episodeName, streamUrl, size, duration, apiConfigs, apiPriority);
-    if (hashMatchResult) {
-      return hashMatchResult;
+    if (featureFlags.enableHashMatch) {
+      var hashMatchResult = await tryMatchByHash(episodeName, streamUrl, size, duration, apiConfigs, apiPriority);
+      if (hashMatchResult) {
+        return hashMatchResult;
+      }
     }
     var _iterator = _createForOfIteratorHelper(apiPriority),
       _step;
@@ -3014,7 +3037,9 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
         };
       }
       // 设置弹窗内的弹幕信息
-      buildCurrentDanmakuInfo(currentDanmakuInfoContainerId);
+      if (featureFlags.enableDanmakuInfoTab) {
+        buildCurrentDanmakuInfo(currentDanmakuInfoContainerId);
+      }
       throw new Error('用户已退出视频播放');
     }
     if (!isVersionOld) {
@@ -3052,7 +3077,7 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
       if (window.ede.danmaku) {
         console.log('Resizing');
         window.ede.danmaku.resize();
-        if (lsGetItem(lsKeys.osdLineChartEnable.id)) {
+        if (featureFlags.enableOsdLineChart && lsGetItem(lsKeys.osdLineChartEnable.id)) {
           buildProgressBarChart(20);
         }
       }
@@ -3067,15 +3092,20 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
       });
     }
     // 设置弹窗内的弹幕信息
-    buildCurrentDanmakuInfo(currentDanmakuInfoContainerId);
+    if (featureFlags.enableDanmakuInfoTab) {
+      buildCurrentDanmakuInfo(currentDanmakuInfoContainerId);
+    }
     // 播放界面右下角添加弹幕信息
     appendvideoOsdDanmakuInfo(_comments.length);
     // 绘制弹幕进度条
-    if (lsGetItem(lsKeys.osdLineChartEnable.id)) {
+    if (featureFlags.enableOsdLineChart && lsGetItem(lsKeys.osdLineChartEnable.id)) {
       buildProgressBarChart(20);
     }
   }
   function buildProgressBarChart(chartHeightNum) {
+    if (!featureFlags.enableOsdLineChart) {
+      return;
+    }
     var chartEle = getById(eleIds.progressBarLineChart);
     if (chartEle) {
       chartEle.remove();
@@ -3252,7 +3282,9 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
     _comments = danmakuSourceFilter(_comments);
     _comments = danmakuDensityLevelFilter(_comments);
     _comments = danmakuKeywordsFilter(_comments);
-    _comments = danmakuMergeSimilar(_comments, lsGetItem(lsKeys.mergeSimilarPercent.id), lsGetItem(lsKeys.mergeSimilarTime.id));
+    if (featureFlags.enableMergeSimilar) {
+      _comments = danmakuMergeSimilar(_comments, lsGetItem(lsKeys.mergeSimilarPercent.id), lsGetItem(lsKeys.mergeSimilarTime.id));
+    }
     return _comments;
   }
   function danmakuAutoFilter(comments) {
@@ -3275,11 +3307,13 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
       lsSetItem(lsKeys.typeFilter.id, typeFilterTemp);
       msg += "\n\u5DF2\u81EA\u52A8\u6DFB\u52A0 ".concat(lsKeys.typeFilter.name, ":").concat(danmakuTypeFilterOpts.bottom.name);
     }
-    var mergeSimilarEnable = lsGetItem(lsKeys.mergeSimilarEnable.id);
-    if (!mergeSimilarEnable) {
-      window.ede.tempLsValues[lsKeys.mergeSimilarEnable.id] = mergeSimilarEnable;
-      lsSetItem(lsKeys.mergeSimilarEnable.id, true);
-      msg += "\n\u5DF2\u81EA\u52A8\u8C03\u6574 ".concat(lsKeys.mergeSimilarEnable.name, ":true");
+    if (featureFlags.enableMergeSimilar) {
+      var mergeSimilarEnable = lsGetItem(lsKeys.mergeSimilarEnable.id);
+      if (!mergeSimilarEnable) {
+        window.ede.tempLsValues[lsKeys.mergeSimilarEnable.id] = mergeSimilarEnable;
+        lsSetItem(lsKeys.mergeSimilarEnable.id, true);
+        msg += "\n\u5DF2\u81EA\u52A8\u8C03\u6574 ".concat(lsKeys.mergeSimilarEnable.name, ":true");
+      }
     }
     if (msg.length != initMsgLenth) {
       embyToast({
@@ -3405,6 +3439,9 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
   function danmakuMergeSimilar(comments) {
     var threshold = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 50;
     var timeWindow = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 15;
+    if (!featureFlags.enableMergeSimilar) {
+      return comments;
+    }
     if (!lsGetItem(lsKeys.mergeSimilarEnable.id)) {
       return comments;
     }
@@ -3706,7 +3743,14 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
         }
       }));
     });
-    buildFontStyleSetting(container);
+    if (featureFlags.enableFontCustomization) {
+      buildFontStyleSetting(container);
+    } else {
+      var fontSettingCollapse = container.querySelector('div[is="emby-collapse"][title="弹幕字体样式"]');
+      if (fontSettingCollapse) {
+        fontSettingCollapse.style.display = 'none';
+      }
+    }
     // 配置 JSON 导入,导出
     buildSettingsBackup(container);
   }
@@ -3751,6 +3795,9 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
     }));
   }
   function buildFontStyleSetting() {
+    if (!featureFlags.enableFontCustomization) {
+      return;
+    }
     getById(eleIds.danmakuFontWeightDiv).append(embySlider({
       lsKey: lsKeys.fontWeight
     }, onSliderChange, onSliderChangeLabel));
@@ -4165,6 +4212,9 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
     getById(eleIds.danmuListDiv, container).append(embyTabs(danmuListTabOpts, lsKeys.danmuList.defaultValue, 'id', 'name', doDanmuListOptsChange));
   }
   function buildExtInfo(container) {
+    if (!featureFlags.enableBangumiCharacters) {
+      return;
+    }
     getById(eleIds.characterImgHeihtDiv, container).append(embySlider({
       labelId: eleIds.characterImgHeihtLabel,
       value: '12',
@@ -4243,6 +4293,24 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
     buildPlaySetting(container);
     buildBangumiSetting(container);
     buildCustomUrlSetting(container);
+    if (!featureFlags.enableMergeSimilar) {
+      [eleIds.danmakuFilterProDiv, eleIds.mergeSimilarPercentDiv, eleIds.mergeSimilarTimeDiv].forEach(function (id) {
+        var ele = getById(id, container);
+        if (ele && ele.parentElement) {
+          ele.parentElement.style.display = 'none';
+        }
+      });
+    }
+    if (!featureFlags.enableOsdLineChart) {
+      var osdLineChartDiv = getById(eleIds.osdLineChartDiv, container);
+      if (osdLineChartDiv && osdLineChartDiv.parentElement) {
+        osdLineChartDiv.parentElement.style.display = 'none';
+      }
+      var osdLineChartTimeDiv = getById(eleIds.osdLineChartTimeDiv, container);
+      if (osdLineChartTimeDiv && osdLineChartTimeDiv.parentElement) {
+        osdLineChartTimeDiv.parentElement.style.display = 'none';
+      }
+    }
   }
   function buildDanmakuFilterSetting(container) {
     getById(eleIds.danmakuTypeFilterDiv, container).append(embyCheckboxList(null, eleIds.danmakuTypeFilterSelectName, lsGetItem(lsKeys.typeFilter.id), Object.values(danmakuTypeFilterOpts).filter(function (o) {
@@ -4254,18 +4322,20 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
       lsKey: lsKeys.autoFilterCount
     }, onSliderChange, onSliderChangeLabel));
     // 合并相似弹幕
-    getById(eleIds.danmakuFilterProDiv, container).append(embyCheckbox({
-      label: labels.enable
-    }, lsGetItem(lsKeys.mergeSimilarEnable.id), function (checked) {
-      lsSetItem(lsKeys.mergeSimilarEnable.id, checked);
-      loadDanmaku(LOAD_TYPE.RELOAD);
-    }));
-    getById(eleIds.mergeSimilarPercentDiv).append(embySlider({
-      lsKey: lsKeys.mergeSimilarPercent
-    }, onSliderChange, onSliderChangeLabel));
-    getById(eleIds.mergeSimilarTimeDiv).append(embySlider({
-      lsKey: lsKeys.mergeSimilarTime
-    }, onSliderChange, onSliderChangeLabel));
+    if (featureFlags.enableMergeSimilar) {
+      getById(eleIds.danmakuFilterProDiv, container).append(embyCheckbox({
+        label: labels.enable
+      }, lsGetItem(lsKeys.mergeSimilarEnable.id), function (checked) {
+        lsSetItem(lsKeys.mergeSimilarEnable.id, checked);
+        loadDanmaku(LOAD_TYPE.RELOAD);
+      }));
+      getById(eleIds.mergeSimilarPercentDiv).append(embySlider({
+        lsKey: lsKeys.mergeSimilarPercent
+      }, onSliderChange, onSliderChangeLabel));
+      getById(eleIds.mergeSimilarTimeDiv).append(embySlider({
+        lsKey: lsKeys.mergeSimilarTime
+      }, onSliderChange, onSliderChangeLabel));
+    }
     // 屏蔽关键词
     var keywordsContainer = getById(eleIds.filterKeywordsDiv, container);
     var keywordsEnableDiv = keywordsContainer.appendChild(document.createElement('div'));
@@ -4325,32 +4395,34 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
       lsSetItem(lsKeys.osdHeaderClockEnable.id, checked);
       checked ? addHeaderClock() : removeHeaderClock();
     }));
-    getById(eleIds.osdLineChartDiv).append(embyCheckbox({
-      label: lsKeys.osdLineChartEnable.name
-    }, lsGetItem(lsKeys.osdLineChartEnable.id), function (checked) {
-      lsSetItem(lsKeys.osdLineChartEnable.id, checked);
-      var progressBarLineChart = getById(eleIds.progressBarLineChart);
-      if (progressBarLineChart) {
-        progressBarLineChart.style.display = checked ? 'block' : 'none';
-      } else if (checked) {
+    if (featureFlags.enableOsdLineChart) {
+      getById(eleIds.osdLineChartDiv).append(embyCheckbox({
+        label: lsKeys.osdLineChartEnable.name
+      }, lsGetItem(lsKeys.osdLineChartEnable.id), function (checked) {
+        lsSetItem(lsKeys.osdLineChartEnable.id, checked);
+        var progressBarLineChart = getById(eleIds.progressBarLineChart);
+        if (progressBarLineChart) {
+          progressBarLineChart.style.display = checked ? 'block' : 'none';
+        } else if (checked) {
+          buildProgressBarChart(20);
+        }
+      }));
+      getById(eleIds.osdLineChartDiv).append(embyCheckbox({
+        label: lsKeys.osdLineChartSkipFilter.name
+      }, lsGetItem(lsKeys.osdLineChartSkipFilter.id), function (checked) {
+        lsSetItem(lsKeys.osdLineChartSkipFilter.id, checked);
         buildProgressBarChart(20);
-      }
-    }));
-    getById(eleIds.osdLineChartDiv).append(embyCheckbox({
-      label: lsKeys.osdLineChartSkipFilter.name
-    }, lsGetItem(lsKeys.osdLineChartSkipFilter.id), function (checked) {
-      lsSetItem(lsKeys.osdLineChartSkipFilter.id, checked);
-      buildProgressBarChart(20);
-    }));
-    getById(eleIds.osdLineChartTimeDiv).append(embySlider({
-      lsKey: lsKeys.osdLineChartTime,
-      needReload: false
-    }, function (val, opts) {
-      onSliderChange(val, opts);
-      if (lsGetItem(lsKeys.osdLineChartEnable.id)) {
-        buildProgressBarChart(20);
-      }
-    }, onSliderChangeLabel));
+      }));
+      getById(eleIds.osdLineChartTimeDiv).append(embySlider({
+        lsKey: lsKeys.osdLineChartTime,
+        needReload: false
+      }, function (val, opts) {
+        onSliderChange(val, opts);
+        if (lsGetItem(lsKeys.osdLineChartEnable.id)) {
+          buildProgressBarChart(20);
+        }
+      }, onSliderChangeLabel));
+    }
   }
   function buildPlaySetting(container) {
     var btnContainer = getById(eleIds.timeoutCallbackDiv, container);
@@ -4472,7 +4544,17 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
     }
     var template = "\n            <div style=\"height: 30em;\">\n                <div id=\"".concat(eleIds.consoleLogCtrl, "\"></div>\n                <div id=\"").concat(eleIds.consoleLogInfo, "\">\n                    <textarea id=\"").concat(eleIds.consoleLogText, "\" readOnly style=\"resize: vertical;margin-top: 0.6em;\"\n                        rows=\"12\" is=\"emby-textarea\" class=\"txtOverview emby-textarea\"></textarea>\n                    <textarea id=\"").concat(eleIds.consoleLogTextInput, "\" hidden style=\"resize: vertical;\"\n                        rows=\"1\" is=\"emby-textarea\" class=\"txtOverview emby-textarea\"></textarea>\n                </div>\n                <div class=\"").concat(classes.embyFieldDesc, "\">\u6CE8\u610F\u5F00\u542F\u540E\u539F\u672C\u63A7\u5236\u53F0\u4E2D\u8C03\u7528\u65B9\u4FE1\u606F\u5C06\u88AB\u8986\u76D6,\u4E0D\u4F7F\u7528\u8BF7\u4FDD\u6301\u5173\u95ED\u72B6\u6001</div>\n                <div id=\"").concat(eleIds.consoleLogCtrl, "\"></div>\n                <div is=\"emby-collapse\" title=\"\u5F00\u53D1\u8005\u9009\u9879\">\n                    <div class=\"").concat(classes.collapseContentNav, "\">\n                        <label class=\"").concat(classes.embyLabel, "\">\u8C03\u8BD5\u5F00\u5173: </label>\n                        <div id=\"").concat(eleIds.debugCheckbox, "\" class=\"").concat(classes.embyCheckboxList, "\" style=\"").concat(styles.embyCheckboxList, "\"></div>\n                        <label class=\"").concat(classes.embyLabel, "\">\u8C03\u8BD5\u6309\u94AE: </label>\n                        <div id=\"").concat(eleIds.debugButton, "\"></div>\n                    </div>\n                </div>\n                <div is=\"emby-collapse\" title=\"\u5F00\u653E\u6E90\u4EE3\u7801\u8BB8\u53EF\" data-expanded=\"true\" style=\"margin-top: 0.6em;\">\n                    <div id=\"").concat(eleIds.openSourceLicenseDiv, "\" class=\"").concat(classes.collapseContentNav, "\" style=\"display: flex; flex-direction: column;\"></div>\n                </div>\n            </div>\n        ");
     container.innerHTML = template.trim();
-    buildConsoleLog(container);
+    if (featureFlags.enableConsoleLogViewer) {
+      buildConsoleLog(container);
+    } else {
+      var consoleLogInfoEle = getById(eleIds.consoleLogInfo, container);
+      if (consoleLogInfoEle) {
+        consoleLogInfoEle.remove();
+      }
+      container.querySelectorAll("#".concat(eleIds.consoleLogCtrl)).forEach(function (ele) {
+        return ele.remove();
+      });
+    }
     buildDebugCheckbox(container);
     buildDebugButton(container);
     buildOpenSourceLicense(container);
@@ -5265,6 +5347,10 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
     btn.disabled = isSame;
   }
   function doConsoleLogChange(checked) {
+    if (!featureFlags.enableConsoleLogViewer || !featureFlags.enableAppLogAspect) {
+      lsSetItem(lsKeys.consoleLogEnable.id, false);
+      return;
+    }
     lsSetItem(lsKeys.consoleLogEnable.id, checked);
     // consoleLogTextEle.style.display = checked ? '' : 'none';
     getById(eleIds.consoleLogInfo).style.display = checked ? '' : 'none';
@@ -5286,8 +5372,10 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
       });
     } else {
       consoleLogTextEle.value = '';
-      window.ede.appLogAspect.destroy();
-      window.ede.appLogAspect = null;
+      if (window.ede.appLogAspect) {
+        window.ede.appLogAspect.destroy();
+        window.ede.appLogAspect = null;
+      }
     }
   }
   function getById(childId) {
@@ -5898,7 +5986,6 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
     var elementMark = isSelector ? target : target.element.tagName;
     var promise = new Promise(function (resolve, reject) {
       function checkElement() {
-        console.log("waitForElement: checking element[".concat(elementMark, "]"));
         var element = null;
         if (isSelector) {
           element = document.querySelector(target);
@@ -6158,7 +6245,7 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
       if (!window.ede) {
         window.ede = new EDE();
       }
-      if (!window.ede.appLogAspect && lsGetItem(lsKeys.consoleLogEnable.id)) {
+      if (featureFlags.enableAppLogAspect && !window.ede.appLogAspect && lsGetItem(lsKeys.consoleLogEnable.id)) {
         window.ede.appLogAspect = new AppLogAspect().init();
       }
       initUI();
