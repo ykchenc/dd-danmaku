@@ -3621,7 +3621,20 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
     formDialogHeader = formDialogHeader || dialogContainer;
     var tabsMenuContainer = document.createElement('div');
     tabsMenuContainer.className = classes.embyTabsMenu;
+    var builtTabs = new Set();
+    function ensureTabBuilt(tab) {
+      if (builtTabs.has(tab.id)) {
+        return;
+      }
+      builtTabs.add(tab.id);
+      try {
+        tab.buildMethod(tab.id);
+      } catch (error) {
+        console.error(error);
+      }
+    }
     tabsMenuContainer.append(embyTabs(danmakuTabOpts, danmakuTabOpts[0].id, 'id', 'name', function (value) {
+      ensureTabBuilt(value);
       danmakuTabOpts.forEach(function (obj) {
         var elem = getById(obj.id);
         if (elem) {
@@ -3637,12 +3650,8 @@ function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == 
       tabContainer.style.textAlign = 'left';
       tabContainer.hidden = index != 0;
       dialogContainer.append(tabContainer);
-      try {
-        tab.buildMethod(tab.id);
-      } catch (error) {
-        console.error(error);
-      }
     });
+    ensureTabBuilt(danmakuTabOpts[0]);
     if (formDialogFooter) {
       formDialogFooter.style.padding = '0.3em';
     }

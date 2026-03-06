@@ -2495,7 +2495,18 @@
         formDialogHeader = formDialogHeader || dialogContainer;
         const tabsMenuContainer = document.createElement('div');
         tabsMenuContainer.className = classes.embyTabsMenu;
+        const builtTabs = new Set();
+        function ensureTabBuilt(tab) {
+            if (builtTabs.has(tab.id)) { return; }
+            builtTabs.add(tab.id);
+            try {
+                tab.buildMethod(tab.id);
+            } catch (error) {
+                console.error(error);
+            }
+        }
         tabsMenuContainer.append(embyTabs(danmakuTabOpts, danmakuTabOpts[0].id, 'id', 'name', (value) => {
+            ensureTabBuilt(value);
             danmakuTabOpts.forEach(obj => {
                 const elem = getById(obj.id);
                 if (elem) { elem.hidden = obj.id !== value.id; }
@@ -2510,12 +2521,8 @@
             tabContainer.style.textAlign = 'left';
             tabContainer.hidden = index != 0;
             dialogContainer.append(tabContainer);
-            try {
-                tab.buildMethod(tab.id);
-            } catch (error) {
-                console.error(error);
-            }
         });
+        ensureTabBuilt(danmakuTabOpts[0]);
         if (formDialogFooter) {
             formDialogFooter.style.padding = '0.3em';
         }
