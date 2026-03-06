@@ -4807,7 +4807,6 @@
     
         const promise = new Promise((resolve, reject) => {
             function checkElement() {
-                console.log(`waitForElement: checking element[${elementMark}]`);
                 let element = null;
                 if (isSelector) {
                     element = document.querySelector(target);
