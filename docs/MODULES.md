@@ -128,6 +128,21 @@
 
 **保留模块**：C01–C23 + O04（Toast）+ O05（自动过滤）+ O07（配置导入导出）+ O14（Bangumi 集成）
 
+**UI 控件改造**（v2、v3 共用）：
+
+将滑块和轴偏移多按钮替换为数值输入框（带加减按钮），减少 DOM 元素数量和自定义元素初始化开销。
+
+| 改造前 | 改造后 | 涉及设置项 |
+|--------|--------|------------|
+| `embySlider`（`<input type="range">`） | 数值输入框 `<input type="number">` + 右侧 `[-]` `[+]` 按钮 | 过滤强度、显示区域、弹幕大小、透明度、速度 |
+| 轴偏秒 9 个按钮（-30/-10/-5/-1/0/+1/+5/+10/+30） | 数值输入框 `<input type="number">` + 右侧 `[-]` `[+]` 按钮 | 轴偏秒 |
+
+改造收益：
+
+- **滑块**：每个 `embySlider` 含 1 个 Emby 自定义元素 + 1 个 `waitForElement` 轮询定时器 + 1 个 `require(['browser'])` → 替换为 3 个原生元素（input + 2 button），无定时器无异步加载
+- **轴偏秒**：9 个 `embyButton`（每个含 `<i>` 图标子元素）= 18 个 DOM 节点 → 替换为 3 个原生元素
+- 弹幕设置 Tab 组件数从 ~16 降至 ~8（每项从 label + slider容器 + slider + label 简化为 label + input + 2 button）
+
 ### 精简版 v3（Lite-v3）— 待规划
 
 **目标**：在 Lite-v2 基础上去除 Emby UI 组件库依赖，使用原生 DOM 元素替代，最大程度减少 Emby 自定义元素的初始化开销与模块加载。
@@ -146,7 +161,7 @@ C20 被以下模块依赖，去除后需要对应改造：
 |------------|----------|
 | C06 UI 初始化 | 按钮改用原生 `<button>` |
 | C15 设置弹窗与 Tab 导航 | `embyDialog` → 自建轻量弹窗，`embyTabs` → 原生 Tab 切换 |
-| C16 弹幕设置 Tab | `embySlider` → 原生 `<input type="range">`，`embyButton` → 原生 `<button>` |
+| C16 弹幕设置 Tab | 沿用 v2 的数值输入框改造方案（`<input type="number">` + `[-]`/`[+]` 按钮），`embyButton` → 原生 `<button>` |
 | C17 手动匹配 Tab | `embyInput`/`embySelect`/`embyButton` → 原生元素 |
 | C18 手动匹配操作 | 适配原生元素事件 |
 | C19 过滤与滑块事件处理 | 适配原生滑块 `input`/`change` 事件 |
