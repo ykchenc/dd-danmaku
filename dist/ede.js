@@ -4208,428 +4208,83 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
     buildSettingsBackup(container);
   }
 
-  async function doDanmakuSearchEpisode() {
-    var _allAnimes$selectAnim;
-    var embySearch = getById(eleIds.danmakuSearchName);
-    if (!embySearch) return;
-    var searchName = embySearch.value.trim();
-    var danmakuRemarkEle = getById(eleIds.danmakuRemark);
-    if (danmakuRemarkEle) {
-      danmakuRemarkEle.parentNode.hidden = false;
-      danmakuRemarkEle.innerText = searchName ? '' : '请填写标题';
-    }
-    var spinnerEle = getByClass(classes.mdlSpinner);
-    if (spinnerEle) spinnerEle.classList.remove('hide');
-    var apiPriority = lsGetItem(lsKeys.apiPriority.id);
-    var apiConfigs = {
-      official: {
-        name: '官方API',
-        prefix: corsProxy + 'https://api.dandanplay.net/api/v2',
-        enabled: lsGetItem(lsKeys.useOfficialApi.id)
-      },
-      custom: {
-        name: '自定义API',
-        prefix: lsGetItem(lsKeys.customApiPrefix.id),
-        enabled: lsGetItem(lsKeys.useCustomApi.id)
-      }
-    };
-    var allAnimes = [];
-    var _iterator = _createForOfIteratorHelper(apiPriority),
-      _step;
-    try {
-      var _loop = async function _loop() {
-        var apiKey = _step.value;
-        var config = apiConfigs[apiKey];
-        if (!config || !config.enabled || apiKey === 'custom' && !config.prefix) return 1; // continue
-        var manualSearchTitle = searchName;
-        var manualSearchEpisode = null;
-        if (apiKey === 'official') {
-          var parsed = parseAnimeName(searchName);
-          if (parsed.season !== null) {
-            manualSearchTitle = parsed.season === 1 ? parsed.title : "".concat(parsed.title, " \u7B2C").concat(parsed.season, "\u5B63");
-            manualSearchEpisode = parsed.episode;
-            console.log("[\u624B\u52A8\u5339\u914D][\u5B98\u65B9API\u4F18\u5316] \u683C\u5F0F\u5316\u641C\u7D22: \u6807\u9898='".concat(manualSearchTitle, "', \u96C6\u6570=").concat(manualSearchEpisode));
-          }
-        }
-        console.log("[\u624B\u52A8\u5339\u914D][".concat(config.name, "] \u6B63\u5728\u641C\u7D22: \u6807\u9898='").concat(manualSearchTitle, "', \u96C6\u6570=").concat(manualSearchEpisode || '无'));
-        var animaInfo = await fetchSearchEpisodes(manualSearchTitle, manualSearchEpisode, config.prefix);
-        if (animaInfo && animaInfo.animes.length > 0) {
-          console.log("[\u624B\u52A8\u5339\u914D][".concat(config.name, "] \u641C\u7D22\u6210\u529F\uFF0C\u627E\u5230 ").concat(animaInfo.animes.length, " \u4E2A\u7ED3\u679C\u3002"));
-          animaInfo.animes.forEach(function (anime) {
-            anime.apiPrefix = config.prefix;
-            anime.apiName = config.name;
-          });
-          allAnimes.push.apply(allAnimes, _toConsumableArray(animaInfo.animes));
-        } else {
-          console.log("[\u624B\u52A8\u5339\u914D][".concat(config.name, "] \u672A\u627E\u5230\u7ED3\u679C\u3002"));
-        }
-      };
-      for (_iterator.s(); !(_step = _iterator.n()).done;) {
-        if (await _loop()) continue;
-      }
-    } catch (err) {
-      _iterator.e(err);
-    } finally {
-      _iterator.f();
-    }
-    if (spinnerEle) spinnerEle.classList.add('hide');
-    if (allAnimes.length < 1) {
-      if (danmakuRemarkEle) danmakuRemarkEle.innerText = '搜索结果为空';
-      var _switchBtn = getById(eleIds.danmakuSwitchEpisode);
-      if (_switchBtn) _switchBtn.disabled = true;
-      var _episodeFlag = getById(eleIds.danmakuEpisodeFlag);
-      if (_episodeFlag) _episodeFlag.hidden = true;
-      return;
-    }
-    if (danmakuRemarkEle) danmakuRemarkEle.innerText = '';
-    var danmakuAnimeDiv = getById(eleIds.danmakuAnimeDiv);
-    var danmakuEpisodeNumDiv = getById(eleIds.danmakuEpisodeNumDiv);
-    if (!danmakuAnimeDiv || !danmakuEpisodeNumDiv) return;
-    danmakuAnimeDiv.innerHTML = '';
-    danmakuEpisodeNumDiv.innerHTML = '';
-    window.ede.searchDanmakuOpts.animes = allAnimes;
-    var selectAnimeIdx = allAnimes.findIndex(function (anime) {
-      return anime.animeId == window.ede.searchDanmakuOpts.animeId;
-    });
-    selectAnimeIdx = selectAnimeIdx !== -1 ? selectAnimeIdx : 0;
-    var animeSelect = embySelect({
-      id: eleIds.danmakuAnimeSelect,
-      label: '剧集: ',
-      style: 'width: auto;max-width: 100%;'
-    }, selectAnimeIdx, allAnimes, 'animeId', function (opt) {
-      return "".concat(opt.animeTitle, " \u7C7B\u578B\uFF1A").concat(opt.typeDescription, " \u6765\u6E90\uFF1A").concat(opt.apiName);
-    }, doDanmakuAnimeSelect);
-    danmakuAnimeDiv.append(animeSelect);
-    var episodes = ((_allAnimes$selectAnim = allAnimes[selectAnimeIdx]) === null || _allAnimes$selectAnim === void 0 ? void 0 : _allAnimes$selectAnim.episodes) || [];
-    var episodeNumSelect = embySelect({
-      id: eleIds.danmakuEpisodeNumSelect,
-      label: '集数: ',
-      style: 'width: auto;max-width: 100%;'
-    }, window.ede.searchDanmakuOpts.episode - 1, episodes, 'episodeId', function (opt, i) {
-      return "".concat(i + 1, " - ").concat(opt.episodeTitle);
-    });
-    danmakuEpisodeNumDiv.append(episodeNumSelect);
-    var episodeFlag = getById(eleIds.danmakuEpisodeFlag);
-    if (episodeFlag) episodeFlag.hidden = false;
-    var switchBtn = getById(eleIds.danmakuSwitchEpisode);
-    if (switchBtn) switchBtn.disabled = false;
-    var selectedAnime = allAnimes[selectAnimeIdx];
-    var searchImg = getById(eleIds.searchImg);
-    if (searchImg) searchImg.src = selectedAnime.imageUrl || dandanplayApi.posterImg(selectedAnime.animeId);
-    var apiSourceDiv = getById(eleIds.searchApiSource);
-    if (apiSourceDiv) apiSourceDiv.innerText = "\u6765\u6E90: ".concat(selectedAnime.apiName);
-  }
-  function doSearchTitleSwtich(e) {
-    var searchInputEle = getById(eleIds.danmakuSearchName);
-    var attrKey = 'isOriginalTitle';
-    if ('1' === e.target.getAttribute(attrKey)) {
-      e.target.setAttribute(attrKey, '0');
-      searchInputEle.value = window.ede.searchDanmakuOpts.animeName;
-      return;
-    }
-    var _window$ede$searchDan = window.ede.searchDanmakuOpts,
-      _episode_key = _window$ede$searchDan._episode_key,
-      seriesOrMovieId = _window$ede$searchDan.seriesOrMovieId;
-    var episode_info = JSON.parse(localStorage.getItem(_episode_key) || '{}');
-    var animeOriginalTitle = episode_info.animeOriginalTitle;
-    if (animeOriginalTitle) {
-      e.target.setAttribute(attrKey, '1');
-      searchInputEle.value = animeOriginalTitle;
-      return;
-    }
-    if (typeof ApiClient !== 'undefined') {
-      ApiClient.getItem(ApiClient.getCurrentUserId(), seriesOrMovieId).then(function (item) {
-        if (item !== null && item !== void 0 && item.OriginalTitle) {
-          e.target.setAttribute(attrKey, '1');
-          searchInputEle.value = item.OriginalTitle;
-          episode_info.animeOriginalTitle = item.OriginalTitle;
-          localStorage.setItem(_episode_key, JSON.stringify(episode_info));
-          if (window.ede.episode_info) window.ede.episode_info.animeOriginalTitle = item.OriginalTitle;
-        }
-      });
-    }
-  }
-  function doDanmakuAnimeSelect(value, index, option) {
-    var numDiv = getById(eleIds.danmakuEpisodeNumDiv);
-    if (!numDiv) return;
-    numDiv.innerHTML = '';
-    var anime = window.ede.searchDanmakuOpts.animes[index];
-    var episodeNumSelect = embySelect({
-      id: eleIds.danmakuEpisodeNumSelect,
-      label: '集数: '
-    }, 0, anime.episodes, 'episodeId', function (opt, i) {
-      return "".concat(i + 1, " - ").concat(opt.episodeTitle);
-    });
-    episodeNumSelect.style.maxWidth = '100%';
-    numDiv.append(episodeNumSelect);
-    var searchImg = getById(eleIds.searchImg);
-    if (searchImg) searchImg.src = anime.imageUrl || dandanplayApi.posterImg(anime.animeId);
-    var apiSourceDiv = getById(eleIds.searchApiSource);
-    if (apiSourceDiv) apiSourceDiv.innerText = "\u6765\u6E90: ".concat(anime.apiName);
-  }
-  function doDanmakuSwitchEpisode() {
-    var animeSelect = getById(eleIds.danmakuAnimeSelect);
-    var episodeNumSelect = getById(eleIds.danmakuEpisodeNumSelect);
-    if (!animeSelect || !episodeNumSelect) return;
-    var anime = window.ede.searchDanmakuOpts.animes[animeSelect.selectedIndex];
-    var _window$ede$searchDan2 = window.ede.searchDanmakuOpts,
-      _episode_key = _window$ede$searchDan2._episode_key,
-      _season_key = _window$ede$searchDan2._season_key,
-      seriesOrMovieId = _window$ede$searchDan2.seriesOrMovieId;
-    var episodeInfo = {
-      episodeId: episodeNumSelect.value,
-      episodeTitle: episodeNumSelect.options[episodeNumSelect.selectedIndex].text,
-      episodeIndex: episodeNumSelect.selectedIndex,
-      bgmEpisodeIndex: episodeNumSelect.selectedIndex,
-      animeId: anime.animeId,
-      animeTitle: anime.animeTitle,
-      animeOriginalTitle: '',
-      imageUrl: anime.imageUrl,
-      seriesOrMovieId: seriesOrMovieId,
-      apiPrefix: anime.apiPrefix,
-      apiName: anime.apiName
-    };
-    var seasonInfo = {
-      name: anime.animeTitle,
-      episodeOffset: episodeNumSelect.selectedIndex - window.ede.searchDanmakuOpts.episode
-    };
-    writeLsSeasonInfo(_season_key, seasonInfo);
-    var useOfficialApi = lsGetItem(lsKeys.useOfficialApi.id);
-    var useCustomApi = lsGetItem(lsKeys.useCustomApi.id);
-    var apiPriority = lsGetItem(lsKeys.apiPriority.id);
-    var enabledApis = apiPriority.filter(function (apiKey) {
-      if (apiKey === 'official') return useOfficialApi;
-      if (apiKey === 'custom') return useCustomApi;
-      return false;
-    });
-    var unique_episode_key = lsLocalKeys.apiPrefix + "".concat(enabledApis.join('_'), "_") + _episode_key;
-    localStorage.setItem(unique_episode_key, JSON.stringify(episodeInfo));
-    if (window.ede.episode_info) {
-      Object.assign(window.ede.episode_info, episodeInfo);
-    } else {
-      window.ede.episode_info = episodeInfo;
-    }
-    window.ede.previous_episode_info = _objectSpread2({}, window.ede.episode_info);
-    console.log('手动匹配成功，已加载新弹幕信息:', episodeInfo);
-    loadDanmaku(LOAD_TYPE.RELOAD);
-    closeEmbyDialog();
-  }
-  function bindManualMatchButtons() {
-    var btnClearCache = getById(eleIds.clearLocalMatchCacheBtn);
-    if (!btnClearCache) return;
-    btnClearCache.addEventListener('click', function () {
-      var prefixesToClear = [lsLocalKeys.animeEpisodePrefix, lsLocalKeys.animeSeasonPrefix, lsLocalKeys.animePrefix, lsLocalKeys.bangumiEpInfoPrefix, lsLocalKeys.bangumiMe, lsLocalKeys.apiPrefix];
-      lsBatchRemove(prefixesToClear);
-      if (window.ede.episode_info) {
-        window.ede.episode_info.episodeId = null;
-        window.ede.episode_info.animeId = null;
-        window.ede.episode_info.animeTitle = null;
-        window.ede.episode_info.episodeTitle = null;
-      }
-      if (window.ede.searchDanmakuOpts) {
-        window.ede.searchDanmakuOpts.animes = [];
-        window.ede.searchDanmakuOpts.episodes = [];
-      }
-      embyToast({
-        text: '本地匹配缓存已清除,包括animeId、episodeId等所有匹配信息'
-      });
-      loadDanmaku(LOAD_TYPE.REFRESH);
-    });
-  }
-  function buildSearchEpisodeEle() {
-    var _window$ede$searchDan3;
-    var searchNameDiv = getById(eleIds.danmakuSearchNameDiv);
-    if (!searchNameDiv) return;
-    searchNameDiv.append(embyInput({
-      id: eleIds.danmakuSearchName,
-      value: ((_window$ede$searchDan3 = window.ede.searchDanmakuOpts) === null || _window$ede$searchDan3 === void 0 ? void 0 : _window$ede$searchDan3.animeName) || '',
-      type: 'search'
-    }, doDanmakuSearchEpisode));
-    searchNameDiv.append(embyButton({
-      label: '搜索',
-      iconKey: iconKeys.search
-    }, doDanmakuSearchEpisode));
-    searchNameDiv.append(embyButton({
-      label: '切换[原]标题',
-      iconKey: iconKeys.text_format
-    }, doSearchTitleSwtich));
-    var episodeLoad = getById(eleIds.danmakuEpisodeLoad);
-    if (episodeLoad) {
-      episodeLoad.append(embyButton({
-        id: eleIds.danmakuSwitchEpisode,
-        label: '加载弹幕',
-        iconKey: iconKeys.done
-      }, doDanmakuSwitchEpisode));
-    }
-    var currentMatchedDiv = getById(eleIds.currentMatchedDiv);
-    if (currentMatchedDiv) {
-      currentMatchedDiv.append(embyButton({
-        label: '取消匹配/清空弹幕',
-        iconKey: iconKeys.close
-      }, function () {
-        var _window$ede$episode_i;
-        if ((_window$ede$episode_i = window.ede.episode_info) !== null && _window$ede$episode_i !== void 0 && _window$ede$episode_i.episodeId) {
-          window.ede.episode_info.episodeId = null;
-        }
-        if (window.ede.danmaku) {
-          createDanmaku([]);
-        }
-        var label = currentMatchedDiv.querySelector('label');
-        if (label) label.textContent = '弹弹 play 总量: 0';
-      }));
-    }
-  }
-  function buildExtUrlsDiv() {
-    var _window$ede$episode_i2, _window$ede$danmuCach, _window$ede$extCommen;
-    var episodeId = ((_window$ede$episode_i2 = window.ede.episode_info) === null || _window$ede$episode_i2 === void 0 ? void 0 : _window$ede$episode_i2.episodeId) || null;
-    var comments = ((_window$ede$danmuCach = window.ede.danmuCache) === null || _window$ede$danmuCach === void 0 ? void 0 : _window$ede$danmuCach[episodeId]) || [];
-    var curExtCommentCache = ((_window$ede$extCommen = window.ede.extCommentCache) === null || _window$ede$extCommen === void 0 ? void 0 : _window$ede$extCommen[window.ede.itemId]) || {};
-    var allComments = comments.concat.apply(comments, _toConsumableArray(Object.values(curExtCommentCache)));
-    var extUrlsDiv = getById(eleIds.extUrlsDiv);
-    if (!extUrlsDiv) return;
-    extUrlsDiv.innerHTML = '';
-    objectEntries(curExtCommentCache).forEach(function (_ref) {
-      var _ref2 = _slicedToArray(_ref, 2),
-        key = _ref2[0],
-        val = _ref2[1];
-      var extUrlDiv = document.createElement('div');
-      extUrlDiv.append(embyButton({
-        label: '清空此加载',
-        iconKey: iconKeys.close
-      }, function (e) {
-        delete curExtCommentCache[key];
-        e.target.parentNode.remove();
-        createDanmaku(allComments.filter(function (c) {
-          return c.fromUrl !== key;
-        }));
-      }));
-      extUrlDiv.append(embyALink(key), document.createTextNode(" \u603B\u91CF: ".concat(val.length)));
-      extUrlsDiv.append(extUrlDiv);
-    });
-  }
-  async function onEnterExtComment(e) {
-    var extUrl = getTargetInput(e).value.trim();
-    if (!extUrl.startsWith('http')) {
-      embyToast({
-        text: '输入的 url 应以 http 开头!'
-      });
-      return;
-    }
-    addExtComments(extUrl);
-  }
-  async function addExtComments(extUrl, extComments) {
-    var _window$ede$danmuCach2;
-    var episode_info = window.ede.episode_info;
-    var episodeId = (episode_info === null || episode_info === void 0 ? void 0 : episode_info.episodeId) || null;
-    var comments = ((_window$ede$danmuCach2 = window.ede.danmuCache) === null || _window$ede$danmuCach2 === void 0 ? void 0 : _window$ede$danmuCach2[episodeId]) || [];
-    if (!extComments) {
-      extComments = await fetchExtcommentActual(extUrl, comments);
-    }
-    if (extComments.length === 0) {
-      embyToast({
-        text: '附加弹幕不能为空!'
-      });
-      return;
-    }
-    var allComments = comments.concat(extComments);
-    createDanmaku(allComments).then(function () {
-      var beforeLength = window.ede.commentsParsed.length - extComments.length;
-      embyToast({
-        text: "\u6B64\u6B21\u9644\u52A0\u603B\u91CF: ".concat(extComments.length, ", \u9644\u52A0\u524D\u603B\u91CF: ").concat(beforeLength, ", \u9644\u52A0\u540E\u603B\u91CF: ").concat(allComments.length)
-      });
-      console.log("\u9644\u52A0\u5F39\u5E55\u5C31\u4F4D, \u9644\u52A0\u524D\u603B\u91CF: ".concat(beforeLength));
-      buildExtUrlsDiv();
-    }).catch(function (err) {
-      return console.log(err);
-    });
-  }
-  function buildExtCommentDiv() {
-    var extCommentSearchDiv = getById(eleIds.extCommentSearchDiv);
-    if (!extCommentSearchDiv) return;
-    buildExtUrlsDiv();
-    extCommentSearchDiv.append(embyInput({
-      type: 'search',
-      placeholder: 'http(s)://'
-    }, onEnterExtComment));
-    extCommentSearchDiv.append(embyButton({
-      label: '搜索',
-      iconKey: iconKeys.search
-    }, onEnterExtComment));
-  }
-  function buildDanmuPluginDiv() {
-    var danmuPluginDiv = getById(eleIds.danmuPluginDiv);
-    if (!danmuPluginDiv) return;
-    danmuPluginDiv.append(embyCheckbox({
-      id: lsKeys.useFetchPluginXml.id,
-      name: lsKeys.useFetchPluginXml.id,
-      label: lsKeys.useFetchPluginXml.name
-    }, lsGetItem(lsKeys.useFetchPluginXml.id), function (checked) {
-      return lsSetItem(lsKeys.useFetchPluginXml.id, checked);
-    }));
-  }
-  function buildCustomApiDiv() {
-    var apiCheckboxListDiv = getById(eleIds.apiCheckboxListDiv);
-    if (!apiCheckboxListDiv) return;
-    apiCheckboxListDiv.append(embyCheckbox({
-      id: lsKeys.useOfficialApi.id,
-      name: lsKeys.useOfficialApi.id,
-      label: lsKeys.useOfficialApi.name
-    }, lsGetItem(lsKeys.useOfficialApi.id), function (checked) {
-      return lsSetItem(lsKeys.useOfficialApi.id, checked);
-    }));
-    apiCheckboxListDiv.append(embyCheckbox({
-      id: lsKeys.useCustomApi.id,
-      name: lsKeys.useCustomApi.id,
-      label: lsKeys.useCustomApi.name
-    }, lsGetItem(lsKeys.useCustomApi.id), function (checked) {
-      return lsSetItem(lsKeys.useCustomApi.id, checked);
-    }));
-    var apiPriorityDiv = getById(eleIds.apiPriorityDiv);
-    if (apiPriorityDiv) {
-      apiPriorityDiv.append(embyTabs(apiPriorityOpts, lsGetItem(lsKeys.apiPriority.id)[0], 'id', 'name', function (value, tabIndex) {
-        var currentPriority = lsGetItem(lsKeys.apiPriority.id);
-        var apiPriorityArr = apiPriorityOpts.map(function (opt) {
-          return opt.id;
-        });
-        var newPriority = currentPriority[0] === apiPriorityArr[1] ? [apiPriorityArr[0], apiPriorityArr[1]] : [apiPriorityArr[1], apiPriorityArr[0]];
-        lsSetItem(lsKeys.apiPriority.id, newPriority);
-        console.log('[API优先级] 切换为:', newPriority[0] === apiPriorityOpts[0].id ? apiPriorityOpts[0].name : apiPriorityOpts[1].name);
-      }));
-    }
-    var customApiPrefixInputDiv = getById(eleIds.customApiPrefixInputDiv);
-    if (customApiPrefixInputDiv) {
-      customApiPrefixInputDiv.append(embyInput({
-        id: 'customApiPrefixInput',
-        value: lsGetItem(lsKeys.customApiPrefix.id) || '',
-        type: 'search'
-      }, null, function (e) {
-        var val = e.target.value.trim();
-        lsSetItem(lsKeys.customApiPrefix.id, val);
-        embyToast({
-          text: '自定义API地址已保存',
-          secondaryText: val
-        });
-      }));
-    }
-  }
+  /**
+   * 播放 OSD 显示/隐藏事件
+   */
 
   /**
-   * 构建手动匹配 Tab
-   * @param {string} containerId
+   * 播放界面右下角显示弹幕信息（弹幕：xxx条 / 未匹配）
+   * 从 ede.js 4116-4140 行迁移
+   * @param {number} [loadSum] - 已加载弹幕数量，不传时从 window.ede 计算
    */
-  function buildSearchEpisode(containerId) {
-    var _window$ede, _window$ede2;
-    var container = getById(containerId);
-    if (!container) return;
-    var episodeId = ((_window$ede = window.ede) === null || _window$ede === void 0 || (_window$ede = _window$ede.episode_info) === null || _window$ede === void 0 ? void 0 : _window$ede.episodeId) || null;
-    var comments = ((_window$ede2 = window.ede) === null || _window$ede2 === void 0 || (_window$ede2 = _window$ede2.danmuCache) === null || _window$ede2 === void 0 ? void 0 : _window$ede2[episodeId]) || [];
-    var template = "\n        <div>\n            <div>\n                <label class=\"".concat(classes.embyLabel, "\">\u6807\u9898: </label>\n                <div id=\"").concat(eleIds.danmakuSearchNameDiv, "\" style=\"display: flex;\"></div>\n            </div>\n            <div id=\"").concat(eleIds.danmakuEpisodeFlag, "\" hidden>\n                <div style=\"display: flex;\">\n                    <div style=\"width: 80%;\">\n                        <label class=\"").concat(classes.embyLabel, "\">\u5A92\u4F53\u540D: </label>\n                        <div id=\"").concat(eleIds.danmakuAnimeDiv, "\" class=\"").concat(classes.embySelectWrapper, "\"></div>\n                        <label class=\"").concat(classes.embyLabel, "\">\u5206\u96C6\u540D: </label>\n                        <div style=\"display: flex;\">\n                            <div id=\"").concat(eleIds.danmakuEpisodeNumDiv, "\" style=\"max-width: 90%;\" class=\"").concat(classes.embySelectWrapper, "\"></div>\n                            <div id=\"").concat(eleIds.danmakuEpisodeLoad, "\"></div>\n                        </div>\n                    </div>\n                    <div style=\"width: 20%; margin: 0 2%; text-align: center;\">\n                        <img id=\"").concat(eleIds.searchImg, "\" style=\"width: 100%; height: auto;\"\n                            loading=\"lazy\" decoding=\"async\" draggable=\"false\" class=\"coveredImage-noScale\"></img>\n                        <div id=\"").concat(eleIds.searchApiSource, "\" class=\"").concat(classes.embyFieldDesc, "\" style=\"margin-top: 0.5em;\">\n                        </div>\n                    </div>\n                </div>\n            </div>\n            <div hidden>\n                <label class=\"").concat(classes.embyLabel, "\" id=\"").concat(eleIds.danmakuRemark, "\"></label>\n            </div>\n            <div>\n                <h4>\u5339\u914D\u6E90</h4>\n                <div style=\"display: flex; justify-content: space-between; align-items: center;\">\n                    <div>\n                        <div id=\"").concat(eleIds.currentMatchedDiv, "\">\n                            <label class=\"").concat(classes.embyLabel, "\">\u5F39\u5F39 play \u603B\u91CF: ").concat(comments.length, "</label>\n                        </div>\n                        <label class=\"").concat(classes.embyLabel, "\">\u5F39\u5F39 play \u9644\u52A0\u7684\u7B2C\u4E09\u65B9 url: </label>\n                    </div>\n                    <button is=\"emby-button\" type=\"button\"\n                        class=\"").concat(classes.embyButtons.basic, "\" id=\"").concat(eleIds.clearLocalMatchCacheBtn, "\">\n                        \u6E05\u9664\u672C\u5730\u5339\u914D\u7F13\u5B58\n                    </button>\n                </div>\n                <div id=\"").concat(eleIds.extUrlsDiv, "\"></div>\n            </div>\n            <div is=\"emby-collapse\" title=\"\u9644\u52A0\u5F39\u5E55\">\n                <div class=\"").concat(classes.collapseContentNav, "\">\n                    <label class=\"").concat(classes.embyLabel, "\">\u5F39\u5F39 play \u652F\u6301\u89E3\u6790\u7684\u7B2C\u4E09\u65B9 url: </label>\n                    <div id=\"").concat(eleIds.extCommentSearchDiv, "\" style=\"display: flex;\"></div>\n                    <div class=\"").concat(classes.embyFieldDesc, "\">\n                        \u539F\u63A5\u53E3\u6587\u6863\u8BF4\u660E\u652F\u6301(\u5982A/B/C\u7AD9),\u81EA\u6D4B\u53E6\u5916\u652F\u6301[ \u7231\u5947\u827A\u89C6\u9891, \u817E\u8BAF\u89C6\u9891, \u4F18\u9177\u89C6\u9891, ],\u4E0D\u652F\u6301[ \u8292\u679C TV, ]\n                    </div>\n                    <div class=\"").concat(classes.embyFieldDesc, "\">\n                        \u4EC5[ \u7231\u5947\u827A\u89C6\u9891, ]\u9700\u8981\u6CE8\u610F\u7F51\u5740\u540E\u4E0D\u80FD\u5E26 ? \u7684\u53C2\u6570,\u5176\u4F59\u7F51\u5740\u5E26\u4E0D\u5E26\u90FD\u53EF\u4EE5\n                    </div>\n                    <div class=\"").concat(classes.embyFieldDesc, "\">\n                        \u8BE6\u7EC6\u7F51\u5740\u793A\u4F8B: \u5F39\u5F39 play PC \u5B98\u65B9\u5BA2\u6237\u7AEF -> \u6DFB\u52A0\u66F4\u591A\u5F39\u5E55 -> \u67E5\u770B\u652F\u6301\u89E3\u6790\u7684\u7F51\u5740\u793A\u4F8B\n                    </div>\n                </div>\n            </div>\n            <div is=\"emby-collapse\" title=\"\u670D\u52A1\u7AEF Danmu \u63D2\u4EF6\">\n                <div class=\"").concat(classes.collapseContentNav, "\">\n                    <div id=\"").concat(eleIds.danmuPluginDiv, "\" class=\"").concat(classes.embyCheckboxList, "\" style=\"").concat(styles.embyCheckboxList, "\"></div>\n                </div>\n            </div>\n            <div is=\"emby-collapse\" title=\"API\u9009\u62E9\u3001\u81EA\u5B9A\u4E49API\u914D\u7F6E\">\n                <div class=\"").concat(classes.collapseContentNav, "\">\n                    <div id=\"").concat(eleIds.apiCheckboxListDiv, "\" class=\"").concat(classes.embyCheckboxList, "\" style=\"").concat(styles.embyCheckboxList, " align-items: center;\">\n                    </div>\n                    <label class=\"").concat(classes.embyLabel, "\">").concat(lsKeys.apiPriority.name, ": </label>\n                    <div id=\"").concat(eleIds.apiPriorityDiv, "\" style=\"margin: 1% 0;\">\n                    </div>\n                    <label class=\"").concat(classes.embyLabel, "\">").concat(lsKeys.customApiPrefix.name, ": </label>\n                    <div id=\"").concat(eleIds.customApiPrefixInputDiv, "\" style=\"display: flex;\">\n                    </div>\n                    <div class=\"").concat(classes.embyFieldDesc, "\">\n                        \u5982\u9700\u81EA\u5B9A\u4E49\u5F39\u5E55API\u5730\u5740,\u8BF7\u586B\u5199\u5B8C\u6574URL(\u5982 https://api.example.com ),<br>\u7559\u7A7A\u5219\u4F7F\u7528\u539F\u751FAPI\n                    </div>\n                </div>\n            </div>\n        </div>\n    ");
-    container.innerHTML = template.trim();
-    buildSearchEpisodeEle();
-    buildExtCommentDiv();
-    buildDanmuPluginDiv();
-    bindManualMatchButtons();
-    buildCustomApiDiv();
+  function appendvideoOsdDanmakuInfo(loadSum) {
+    var _window$ede;
+    if (!lsGetItem(lsKeys.osdTitleEnable.id)) return;
+    var episode_info = ((_window$ede = window.ede) === null || _window$ede === void 0 ? void 0 : _window$ede.episode_info) || {};
+    var episodeId = episode_info.episodeId,
+      animeTitle = episode_info.animeTitle,
+      episodeTitle = episode_info.episodeTitle;
+    var videoOsdContainer = document.querySelector("".concat(mediaContainerQueryStr, " .videoOsdSecondaryText"));
+    var videoOsdDanmakuTitle = getById(eleIds.videoOsdDanmakuTitle, videoOsdContainer);
+    if (!videoOsdDanmakuTitle) {
+      videoOsdDanmakuTitle = document.createElement('h3');
+      videoOsdDanmakuTitle.id = eleIds.videoOsdDanmakuTitle;
+      videoOsdDanmakuTitle.classList.add(classes.videoOsdTitle);
+      videoOsdDanmakuTitle.style.cssText = 'margin-left: auto; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; position: absolute; right: 0px; bottom: 0px;';
+    }
+    var text = '弹幕：';
+    if (episodeId) {
+      var count = loadSum !== null && loadSum !== void 0 ? loadSum : window.ede ? getDanmakuComments(window.ede).length : 0;
+      text += "".concat(animeTitle, " - ").concat(episodeTitle, " - ").concat(count, "\u6761");
+    } else {
+      text += '未匹配';
+    }
+    videoOsdDanmakuTitle.innerText = text;
+    if (videoOsdContainer) {
+      videoOsdContainer.append(videoOsdDanmakuTitle);
+    }
+  }
+  function addHeaderClock() {
+    var _window$ede2;
+    var warpper = getByClass('headerMiddle');
+    var headerClockEle = getById('headerClock');
+    if (!warpper) return;
+    if (headerClockEle) headerClockEle.remove();
+    var clockElement = document.createElement('div');
+    clockElement.id = 'headerClock';
+    warpper.append(clockElement);
+    function updateClock() {
+      clockElement.textContent = new Date().toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    }
+    updateClock();
+    var intervalId = setInterval(updateClock, 1000);
+    if ((_window$ede2 = window.ede) !== null && _window$ede2 !== void 0 && _window$ede2.destroyIntervalIds) {
+      window.ede.destroyIntervalIds.push(intervalId);
+    }
+  }
+  function removeHeaderClock() {
+    var headerClockEle = getById('headerClock');
+    if (headerClockEle) headerClockEle.remove();
+    destroyAllInterval();
+  }
+  function onVideoOsdShow(e) {
+    console.log(e === null || e === void 0 ? void 0 : e.type, e);
+    if (lsGetItem(lsKeys.osdLineChartEnable.id)) {
+      buildProgressBarChart(20);
+    }
+    if (lsGetItem(lsKeys.osdHeaderClockEnable.id)) {
+      addHeaderClock();
+    }
+  }
+  function onVideoOsdHide(e) {
+    console.log(e === null || e === void 0 ? void 0 : e.type, e);
+    if (lsGetItem(lsKeys.osdHeaderClockEnable.id)) {
+      removeHeaderClock();
+    }
   }
 
   /**
@@ -4914,83 +4569,432 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
     }));
   }
 
-  /**
-   * 播放 OSD 显示/隐藏事件
-   */
-
-  /**
-   * 播放界面右下角显示弹幕信息（弹幕：xxx条 / 未匹配）
-   * 从 ede.js 4116-4140 行迁移
-   * @param {number} [loadSum] - 已加载弹幕数量，不传时从 window.ede 计算
-   */
-  function appendvideoOsdDanmakuInfo(loadSum) {
-    var _window$ede;
-    if (!lsGetItem(lsKeys.osdTitleEnable.id)) return;
-    var episode_info = ((_window$ede = window.ede) === null || _window$ede === void 0 ? void 0 : _window$ede.episode_info) || {};
-    var episodeId = episode_info.episodeId,
-      animeTitle = episode_info.animeTitle,
-      episodeTitle = episode_info.episodeTitle;
-    var videoOsdContainer = document.querySelector("".concat(mediaContainerQueryStr, " .videoOsdSecondaryText"));
-    var videoOsdDanmakuTitle = getById(eleIds.videoOsdDanmakuTitle, videoOsdContainer);
-    if (!videoOsdDanmakuTitle) {
-      videoOsdDanmakuTitle = document.createElement('h3');
-      videoOsdDanmakuTitle.id = eleIds.videoOsdDanmakuTitle;
-      videoOsdDanmakuTitle.classList.add(classes.videoOsdTitle);
-      videoOsdDanmakuTitle.style.cssText = 'margin-left: auto; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; position: absolute; right: 0px; bottom: 0px;';
+  var createDanmakuHooks = {
+    buildCurrentDanmakuInfo: buildCurrentDanmakuInfo,
+    appendvideoOsdDanmakuInfo: appendvideoOsdDanmakuInfo
+  };
+  async function doDanmakuSearchEpisode() {
+    var _allAnimes$selectAnim;
+    var embySearch = getById(eleIds.danmakuSearchName);
+    if (!embySearch) return;
+    var searchName = embySearch.value.trim();
+    var danmakuRemarkEle = getById(eleIds.danmakuRemark);
+    if (danmakuRemarkEle) {
+      danmakuRemarkEle.parentNode.hidden = false;
+      danmakuRemarkEle.innerText = searchName ? '' : '请填写标题';
     }
-    var text = '弹幕：';
-    if (episodeId) {
-      var count = loadSum !== null && loadSum !== void 0 ? loadSum : window.ede ? getDanmakuComments(window.ede).length : 0;
-      text += "".concat(animeTitle, " - ").concat(episodeTitle, " - ").concat(count, "\u6761");
-    } else {
-      text += '未匹配';
+    var spinnerEle = getByClass(classes.mdlSpinner);
+    if (spinnerEle) spinnerEle.classList.remove('hide');
+    var apiPriority = lsGetItem(lsKeys.apiPriority.id);
+    var apiConfigs = {
+      official: {
+        name: '官方API',
+        prefix: corsProxy + 'https://api.dandanplay.net/api/v2',
+        enabled: lsGetItem(lsKeys.useOfficialApi.id)
+      },
+      custom: {
+        name: '自定义API',
+        prefix: lsGetItem(lsKeys.customApiPrefix.id),
+        enabled: lsGetItem(lsKeys.useCustomApi.id)
+      }
+    };
+    var allAnimes = [];
+    var _iterator = _createForOfIteratorHelper(apiPriority),
+      _step;
+    try {
+      var _loop = async function _loop() {
+        var apiKey = _step.value;
+        var config = apiConfigs[apiKey];
+        if (!config || !config.enabled || apiKey === 'custom' && !config.prefix) return 1; // continue
+        var manualSearchTitle = searchName;
+        var manualSearchEpisode = null;
+        if (apiKey === 'official') {
+          var parsed = parseAnimeName(searchName);
+          if (parsed.season !== null) {
+            manualSearchTitle = parsed.season === 1 ? parsed.title : "".concat(parsed.title, " \u7B2C").concat(parsed.season, "\u5B63");
+            manualSearchEpisode = parsed.episode;
+            console.log("[\u624B\u52A8\u5339\u914D][\u5B98\u65B9API\u4F18\u5316] \u683C\u5F0F\u5316\u641C\u7D22: \u6807\u9898='".concat(manualSearchTitle, "', \u96C6\u6570=").concat(manualSearchEpisode));
+          }
+        }
+        console.log("[\u624B\u52A8\u5339\u914D][".concat(config.name, "] \u6B63\u5728\u641C\u7D22: \u6807\u9898='").concat(manualSearchTitle, "', \u96C6\u6570=").concat(manualSearchEpisode || '无'));
+        var animaInfo = await fetchSearchEpisodes(manualSearchTitle, manualSearchEpisode, config.prefix);
+        if (animaInfo && animaInfo.animes.length > 0) {
+          console.log("[\u624B\u52A8\u5339\u914D][".concat(config.name, "] \u641C\u7D22\u6210\u529F\uFF0C\u627E\u5230 ").concat(animaInfo.animes.length, " \u4E2A\u7ED3\u679C\u3002"));
+          animaInfo.animes.forEach(function (anime) {
+            anime.apiPrefix = config.prefix;
+            anime.apiName = config.name;
+          });
+          allAnimes.push.apply(allAnimes, _toConsumableArray(animaInfo.animes));
+        } else {
+          console.log("[\u624B\u52A8\u5339\u914D][".concat(config.name, "] \u672A\u627E\u5230\u7ED3\u679C\u3002"));
+        }
+      };
+      for (_iterator.s(); !(_step = _iterator.n()).done;) {
+        if (await _loop()) continue;
+      }
+    } catch (err) {
+      _iterator.e(err);
+    } finally {
+      _iterator.f();
     }
-    videoOsdDanmakuTitle.innerText = text;
-    if (videoOsdContainer) {
-      videoOsdContainer.append(videoOsdDanmakuTitle);
+    if (spinnerEle) spinnerEle.classList.add('hide');
+    if (allAnimes.length < 1) {
+      if (danmakuRemarkEle) danmakuRemarkEle.innerText = '搜索结果为空';
+      var _switchBtn = getById(eleIds.danmakuSwitchEpisode);
+      if (_switchBtn) _switchBtn.disabled = true;
+      var _episodeFlag = getById(eleIds.danmakuEpisodeFlag);
+      if (_episodeFlag) _episodeFlag.hidden = true;
+      return;
     }
+    if (danmakuRemarkEle) danmakuRemarkEle.innerText = '';
+    var danmakuAnimeDiv = getById(eleIds.danmakuAnimeDiv);
+    var danmakuEpisodeNumDiv = getById(eleIds.danmakuEpisodeNumDiv);
+    if (!danmakuAnimeDiv || !danmakuEpisodeNumDiv) return;
+    danmakuAnimeDiv.innerHTML = '';
+    danmakuEpisodeNumDiv.innerHTML = '';
+    window.ede.searchDanmakuOpts.animes = allAnimes;
+    var selectAnimeIdx = allAnimes.findIndex(function (anime) {
+      return anime.animeId == window.ede.searchDanmakuOpts.animeId;
+    });
+    selectAnimeIdx = selectAnimeIdx !== -1 ? selectAnimeIdx : 0;
+    var animeSelect = embySelect({
+      id: eleIds.danmakuAnimeSelect,
+      label: '剧集: ',
+      style: 'width: auto;max-width: 100%;'
+    }, selectAnimeIdx, allAnimes, 'animeId', function (opt) {
+      return "".concat(opt.animeTitle, " \u7C7B\u578B\uFF1A").concat(opt.typeDescription, " \u6765\u6E90\uFF1A").concat(opt.apiName);
+    }, doDanmakuAnimeSelect);
+    danmakuAnimeDiv.append(animeSelect);
+    var episodes = ((_allAnimes$selectAnim = allAnimes[selectAnimeIdx]) === null || _allAnimes$selectAnim === void 0 ? void 0 : _allAnimes$selectAnim.episodes) || [];
+    var episodeNumSelect = embySelect({
+      id: eleIds.danmakuEpisodeNumSelect,
+      label: '集数: ',
+      style: 'width: auto;max-width: 100%;'
+    }, window.ede.searchDanmakuOpts.episode - 1, episodes, 'episodeId', function (opt, i) {
+      return "".concat(i + 1, " - ").concat(opt.episodeTitle);
+    });
+    danmakuEpisodeNumDiv.append(episodeNumSelect);
+    var episodeFlag = getById(eleIds.danmakuEpisodeFlag);
+    if (episodeFlag) episodeFlag.hidden = false;
+    var switchBtn = getById(eleIds.danmakuSwitchEpisode);
+    if (switchBtn) switchBtn.disabled = false;
+    var selectedAnime = allAnimes[selectAnimeIdx];
+    var searchImg = getById(eleIds.searchImg);
+    if (searchImg) searchImg.src = selectedAnime.imageUrl || dandanplayApi.posterImg(selectedAnime.animeId);
+    var apiSourceDiv = getById(eleIds.searchApiSource);
+    if (apiSourceDiv) apiSourceDiv.innerText = "\u6765\u6E90: ".concat(selectedAnime.apiName);
   }
-  function addHeaderClock() {
-    var _window$ede2;
-    var warpper = getByClass('headerMiddle');
-    var headerClockEle = getById('headerClock');
-    if (!warpper) return;
-    if (headerClockEle) headerClockEle.remove();
-    var clockElement = document.createElement('div');
-    clockElement.id = 'headerClock';
-    warpper.append(clockElement);
-    function updateClock() {
-      clockElement.textContent = new Date().toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
+  function doSearchTitleSwtich(e) {
+    var searchInputEle = getById(eleIds.danmakuSearchName);
+    var attrKey = 'isOriginalTitle';
+    if ('1' === e.target.getAttribute(attrKey)) {
+      e.target.setAttribute(attrKey, '0');
+      searchInputEle.value = window.ede.searchDanmakuOpts.animeName;
+      return;
+    }
+    var _window$ede$searchDan = window.ede.searchDanmakuOpts,
+      _episode_key = _window$ede$searchDan._episode_key,
+      seriesOrMovieId = _window$ede$searchDan.seriesOrMovieId;
+    var episode_info = JSON.parse(localStorage.getItem(_episode_key) || '{}');
+    var animeOriginalTitle = episode_info.animeOriginalTitle;
+    if (animeOriginalTitle) {
+      e.target.setAttribute(attrKey, '1');
+      searchInputEle.value = animeOriginalTitle;
+      return;
+    }
+    if (typeof ApiClient !== 'undefined') {
+      ApiClient.getItem(ApiClient.getCurrentUserId(), seriesOrMovieId).then(function (item) {
+        if (item !== null && item !== void 0 && item.OriginalTitle) {
+          e.target.setAttribute(attrKey, '1');
+          searchInputEle.value = item.OriginalTitle;
+          episode_info.animeOriginalTitle = item.OriginalTitle;
+          localStorage.setItem(_episode_key, JSON.stringify(episode_info));
+          if (window.ede.episode_info) window.ede.episode_info.animeOriginalTitle = item.OriginalTitle;
+        }
       });
     }
-    updateClock();
-    var intervalId = setInterval(updateClock, 1000);
-    if ((_window$ede2 = window.ede) !== null && _window$ede2 !== void 0 && _window$ede2.destroyIntervalIds) {
-      window.ede.destroyIntervalIds.push(intervalId);
+  }
+  function doDanmakuAnimeSelect(value, index, option) {
+    var numDiv = getById(eleIds.danmakuEpisodeNumDiv);
+    if (!numDiv) return;
+    numDiv.innerHTML = '';
+    var anime = window.ede.searchDanmakuOpts.animes[index];
+    var episodeNumSelect = embySelect({
+      id: eleIds.danmakuEpisodeNumSelect,
+      label: '集数: '
+    }, 0, anime.episodes, 'episodeId', function (opt, i) {
+      return "".concat(i + 1, " - ").concat(opt.episodeTitle);
+    });
+    episodeNumSelect.style.maxWidth = '100%';
+    numDiv.append(episodeNumSelect);
+    var searchImg = getById(eleIds.searchImg);
+    if (searchImg) searchImg.src = anime.imageUrl || dandanplayApi.posterImg(anime.animeId);
+    var apiSourceDiv = getById(eleIds.searchApiSource);
+    if (apiSourceDiv) apiSourceDiv.innerText = "\u6765\u6E90: ".concat(anime.apiName);
+  }
+  function doDanmakuSwitchEpisode() {
+    var animeSelect = getById(eleIds.danmakuAnimeSelect);
+    var episodeNumSelect = getById(eleIds.danmakuEpisodeNumSelect);
+    if (!animeSelect || !episodeNumSelect) return;
+    var anime = window.ede.searchDanmakuOpts.animes[animeSelect.selectedIndex];
+    var _window$ede$searchDan2 = window.ede.searchDanmakuOpts,
+      _episode_key = _window$ede$searchDan2._episode_key,
+      _season_key = _window$ede$searchDan2._season_key,
+      seriesOrMovieId = _window$ede$searchDan2.seriesOrMovieId;
+    var episodeInfo = {
+      episodeId: episodeNumSelect.value,
+      episodeTitle: episodeNumSelect.options[episodeNumSelect.selectedIndex].text,
+      episodeIndex: episodeNumSelect.selectedIndex,
+      bgmEpisodeIndex: episodeNumSelect.selectedIndex,
+      animeId: anime.animeId,
+      animeTitle: anime.animeTitle,
+      animeOriginalTitle: '',
+      imageUrl: anime.imageUrl,
+      seriesOrMovieId: seriesOrMovieId,
+      apiPrefix: anime.apiPrefix,
+      apiName: anime.apiName
+    };
+    var seasonInfo = {
+      name: anime.animeTitle,
+      episodeOffset: episodeNumSelect.selectedIndex - window.ede.searchDanmakuOpts.episode
+    };
+    writeLsSeasonInfo(_season_key, seasonInfo);
+    var useOfficialApi = lsGetItem(lsKeys.useOfficialApi.id);
+    var useCustomApi = lsGetItem(lsKeys.useCustomApi.id);
+    var apiPriority = lsGetItem(lsKeys.apiPriority.id);
+    var enabledApis = apiPriority.filter(function (apiKey) {
+      if (apiKey === 'official') return useOfficialApi;
+      if (apiKey === 'custom') return useCustomApi;
+      return false;
+    });
+    var unique_episode_key = lsLocalKeys.apiPrefix + "".concat(enabledApis.join('_'), "_") + _episode_key;
+    localStorage.setItem(unique_episode_key, JSON.stringify(episodeInfo));
+    if (window.ede.episode_info) {
+      Object.assign(window.ede.episode_info, episodeInfo);
+    } else {
+      window.ede.episode_info = episodeInfo;
+    }
+    window.ede.previous_episode_info = _objectSpread2({}, window.ede.episode_info);
+    console.log('手动匹配成功，已加载新弹幕信息:', episodeInfo);
+    loadDanmaku(LOAD_TYPE.RELOAD);
+    closeEmbyDialog();
+  }
+  function bindManualMatchButtons() {
+    var btnClearCache = getById(eleIds.clearLocalMatchCacheBtn);
+    if (!btnClearCache) return;
+    btnClearCache.addEventListener('click', function () {
+      var prefixesToClear = [lsLocalKeys.animeEpisodePrefix, lsLocalKeys.animeSeasonPrefix, lsLocalKeys.animePrefix, lsLocalKeys.bangumiEpInfoPrefix, lsLocalKeys.bangumiMe, lsLocalKeys.apiPrefix];
+      lsBatchRemove(prefixesToClear);
+      if (window.ede.episode_info) {
+        window.ede.episode_info.episodeId = null;
+        window.ede.episode_info.animeId = null;
+        window.ede.episode_info.animeTitle = null;
+        window.ede.episode_info.episodeTitle = null;
+      }
+      if (window.ede.searchDanmakuOpts) {
+        window.ede.searchDanmakuOpts.animes = [];
+        window.ede.searchDanmakuOpts.episodes = [];
+      }
+      embyToast({
+        text: '本地匹配缓存已清除,包括animeId、episodeId等所有匹配信息'
+      });
+      loadDanmaku(LOAD_TYPE.REFRESH);
+    });
+  }
+  function buildSearchEpisodeEle() {
+    var _window$ede$searchDan3;
+    var searchNameDiv = getById(eleIds.danmakuSearchNameDiv);
+    if (!searchNameDiv) return;
+    searchNameDiv.append(embyInput({
+      id: eleIds.danmakuSearchName,
+      value: ((_window$ede$searchDan3 = window.ede.searchDanmakuOpts) === null || _window$ede$searchDan3 === void 0 ? void 0 : _window$ede$searchDan3.animeName) || '',
+      type: 'search'
+    }, doDanmakuSearchEpisode));
+    searchNameDiv.append(embyButton({
+      label: '搜索',
+      iconKey: iconKeys.search
+    }, doDanmakuSearchEpisode));
+    searchNameDiv.append(embyButton({
+      label: '切换[原]标题',
+      iconKey: iconKeys.text_format
+    }, doSearchTitleSwtich));
+    var episodeLoad = getById(eleIds.danmakuEpisodeLoad);
+    if (episodeLoad) {
+      episodeLoad.append(embyButton({
+        id: eleIds.danmakuSwitchEpisode,
+        label: '加载弹幕',
+        iconKey: iconKeys.done
+      }, doDanmakuSwitchEpisode));
+    }
+    var currentMatchedDiv = getById(eleIds.currentMatchedDiv);
+    if (currentMatchedDiv) {
+      currentMatchedDiv.append(embyButton({
+        label: '取消匹配/清空弹幕',
+        iconKey: iconKeys.close
+      }, function () {
+        var _window$ede$episode_i;
+        if ((_window$ede$episode_i = window.ede.episode_info) !== null && _window$ede$episode_i !== void 0 && _window$ede$episode_i.episodeId) {
+          window.ede.episode_info.episodeId = null;
+        }
+        if (window.ede.danmaku) {
+          createDanmaku([], createDanmakuHooks);
+        }
+        var label = currentMatchedDiv.querySelector('label');
+        if (label) label.textContent = '弹弹 play 总量: 0';
+      }));
     }
   }
-  function removeHeaderClock() {
-    var headerClockEle = getById('headerClock');
-    if (headerClockEle) headerClockEle.remove();
-    destroyAllInterval();
+  function buildExtUrlsDiv() {
+    var _window$ede$episode_i2, _window$ede$danmuCach, _window$ede$extCommen;
+    var episodeId = ((_window$ede$episode_i2 = window.ede.episode_info) === null || _window$ede$episode_i2 === void 0 ? void 0 : _window$ede$episode_i2.episodeId) || null;
+    var comments = ((_window$ede$danmuCach = window.ede.danmuCache) === null || _window$ede$danmuCach === void 0 ? void 0 : _window$ede$danmuCach[episodeId]) || [];
+    var curExtCommentCache = ((_window$ede$extCommen = window.ede.extCommentCache) === null || _window$ede$extCommen === void 0 ? void 0 : _window$ede$extCommen[window.ede.itemId]) || {};
+    var allComments = comments.concat.apply(comments, _toConsumableArray(Object.values(curExtCommentCache)));
+    var extUrlsDiv = getById(eleIds.extUrlsDiv);
+    if (!extUrlsDiv) return;
+    extUrlsDiv.innerHTML = '';
+    objectEntries(curExtCommentCache).forEach(function (_ref) {
+      var _ref2 = _slicedToArray(_ref, 2),
+        key = _ref2[0],
+        val = _ref2[1];
+      var extUrlDiv = document.createElement('div');
+      extUrlDiv.append(embyButton({
+        label: '清空此加载',
+        iconKey: iconKeys.close
+      }, function (e) {
+        delete curExtCommentCache[key];
+        e.target.parentNode.remove();
+        createDanmaku(allComments.filter(function (c) {
+          return c.fromUrl !== key;
+        }), createDanmakuHooks);
+      }));
+      extUrlDiv.append(embyALink(key), document.createTextNode(" \u603B\u91CF: ".concat(val.length)));
+      extUrlsDiv.append(extUrlDiv);
+    });
   }
-  function onVideoOsdShow(e) {
-    console.log(e === null || e === void 0 ? void 0 : e.type, e);
-    if (lsGetItem(lsKeys.osdLineChartEnable.id)) {
-      buildProgressBarChart(20);
+  async function onEnterExtComment(e) {
+    var extUrl = getTargetInput(e).value.trim();
+    if (!extUrl.startsWith('http')) {
+      embyToast({
+        text: '输入的 url 应以 http 开头!'
+      });
+      return;
     }
-    if (lsGetItem(lsKeys.osdHeaderClockEnable.id)) {
-      addHeaderClock();
+    addExtComments(extUrl);
+  }
+  async function addExtComments(extUrl, extComments) {
+    var _window$ede$danmuCach2;
+    var episode_info = window.ede.episode_info;
+    var episodeId = (episode_info === null || episode_info === void 0 ? void 0 : episode_info.episodeId) || null;
+    var comments = ((_window$ede$danmuCach2 = window.ede.danmuCache) === null || _window$ede$danmuCach2 === void 0 ? void 0 : _window$ede$danmuCach2[episodeId]) || [];
+    if (!extComments) {
+      extComments = await fetchExtcommentActual(extUrl, comments);
+    }
+    if (extComments.length === 0) {
+      embyToast({
+        text: '附加弹幕不能为空!'
+      });
+      return;
+    }
+    var allComments = comments.concat(extComments);
+    createDanmaku(allComments, createDanmakuHooks).then(function () {
+      var beforeLength = window.ede.commentsParsed.length - extComments.length;
+      embyToast({
+        text: "\u6B64\u6B21\u9644\u52A0\u603B\u91CF: ".concat(extComments.length, ", \u9644\u52A0\u524D\u603B\u91CF: ").concat(beforeLength, ", \u9644\u52A0\u540E\u603B\u91CF: ").concat(allComments.length)
+      });
+      console.log("\u9644\u52A0\u5F39\u5E55\u5C31\u4F4D, \u9644\u52A0\u524D\u603B\u91CF: ".concat(beforeLength));
+      buildExtUrlsDiv();
+    }).catch(function (err) {
+      return console.log(err);
+    });
+  }
+  function buildExtCommentDiv() {
+    var extCommentSearchDiv = getById(eleIds.extCommentSearchDiv);
+    if (!extCommentSearchDiv) return;
+    buildExtUrlsDiv();
+    extCommentSearchDiv.append(embyInput({
+      type: 'search',
+      placeholder: 'http(s)://'
+    }, onEnterExtComment));
+    extCommentSearchDiv.append(embyButton({
+      label: '搜索',
+      iconKey: iconKeys.search
+    }, onEnterExtComment));
+  }
+  function buildDanmuPluginDiv() {
+    var danmuPluginDiv = getById(eleIds.danmuPluginDiv);
+    if (!danmuPluginDiv) return;
+    danmuPluginDiv.append(embyCheckbox({
+      id: lsKeys.useFetchPluginXml.id,
+      name: lsKeys.useFetchPluginXml.id,
+      label: lsKeys.useFetchPluginXml.name
+    }, lsGetItem(lsKeys.useFetchPluginXml.id), function (checked) {
+      return lsSetItem(lsKeys.useFetchPluginXml.id, checked);
+    }));
+  }
+  function buildCustomApiDiv() {
+    var apiCheckboxListDiv = getById(eleIds.apiCheckboxListDiv);
+    if (!apiCheckboxListDiv) return;
+    apiCheckboxListDiv.append(embyCheckbox({
+      id: lsKeys.useOfficialApi.id,
+      name: lsKeys.useOfficialApi.id,
+      label: lsKeys.useOfficialApi.name
+    }, lsGetItem(lsKeys.useOfficialApi.id), function (checked) {
+      return lsSetItem(lsKeys.useOfficialApi.id, checked);
+    }));
+    apiCheckboxListDiv.append(embyCheckbox({
+      id: lsKeys.useCustomApi.id,
+      name: lsKeys.useCustomApi.id,
+      label: lsKeys.useCustomApi.name
+    }, lsGetItem(lsKeys.useCustomApi.id), function (checked) {
+      return lsSetItem(lsKeys.useCustomApi.id, checked);
+    }));
+    var apiPriorityDiv = getById(eleIds.apiPriorityDiv);
+    if (apiPriorityDiv) {
+      apiPriorityDiv.append(embyTabs(apiPriorityOpts, lsGetItem(lsKeys.apiPriority.id)[0], 'id', 'name', function (value, tabIndex) {
+        var currentPriority = lsGetItem(lsKeys.apiPriority.id);
+        var apiPriorityArr = apiPriorityOpts.map(function (opt) {
+          return opt.id;
+        });
+        var newPriority = currentPriority[0] === apiPriorityArr[1] ? [apiPriorityArr[0], apiPriorityArr[1]] : [apiPriorityArr[1], apiPriorityArr[0]];
+        lsSetItem(lsKeys.apiPriority.id, newPriority);
+        console.log('[API优先级] 切换为:', newPriority[0] === apiPriorityOpts[0].id ? apiPriorityOpts[0].name : apiPriorityOpts[1].name);
+      }));
+    }
+    var customApiPrefixInputDiv = getById(eleIds.customApiPrefixInputDiv);
+    if (customApiPrefixInputDiv) {
+      customApiPrefixInputDiv.append(embyInput({
+        id: 'customApiPrefixInput',
+        value: lsGetItem(lsKeys.customApiPrefix.id) || '',
+        type: 'search'
+      }, null, function (e) {
+        var val = e.target.value.trim();
+        lsSetItem(lsKeys.customApiPrefix.id, val);
+        embyToast({
+          text: '自定义API地址已保存',
+          secondaryText: val
+        });
+      }));
     }
   }
-  function onVideoOsdHide(e) {
-    console.log(e === null || e === void 0 ? void 0 : e.type, e);
-    if (lsGetItem(lsKeys.osdHeaderClockEnable.id)) {
-      removeHeaderClock();
-    }
+
+  /**
+   * 构建手动匹配 Tab
+   * @param {string} containerId
+   */
+  function buildSearchEpisode(containerId) {
+    var _window$ede, _window$ede2;
+    var container = getById(containerId);
+    if (!container) return;
+    var episodeId = ((_window$ede = window.ede) === null || _window$ede === void 0 || (_window$ede = _window$ede.episode_info) === null || _window$ede === void 0 ? void 0 : _window$ede.episodeId) || null;
+    var comments = ((_window$ede2 = window.ede) === null || _window$ede2 === void 0 || (_window$ede2 = _window$ede2.danmuCache) === null || _window$ede2 === void 0 ? void 0 : _window$ede2[episodeId]) || [];
+    var template = "\n        <div>\n            <div>\n                <label class=\"".concat(classes.embyLabel, "\">\u6807\u9898: </label>\n                <div id=\"").concat(eleIds.danmakuSearchNameDiv, "\" style=\"display: flex;\"></div>\n            </div>\n            <div id=\"").concat(eleIds.danmakuEpisodeFlag, "\" hidden>\n                <div style=\"display: flex;\">\n                    <div style=\"width: 80%;\">\n                        <label class=\"").concat(classes.embyLabel, "\">\u5A92\u4F53\u540D: </label>\n                        <div id=\"").concat(eleIds.danmakuAnimeDiv, "\" class=\"").concat(classes.embySelectWrapper, "\"></div>\n                        <label class=\"").concat(classes.embyLabel, "\">\u5206\u96C6\u540D: </label>\n                        <div style=\"display: flex;\">\n                            <div id=\"").concat(eleIds.danmakuEpisodeNumDiv, "\" style=\"max-width: 90%;\" class=\"").concat(classes.embySelectWrapper, "\"></div>\n                            <div id=\"").concat(eleIds.danmakuEpisodeLoad, "\"></div>\n                        </div>\n                    </div>\n                    <div style=\"width: 20%; margin: 0 2%; text-align: center;\">\n                        <img id=\"").concat(eleIds.searchImg, "\" style=\"width: 100%; height: auto;\"\n                            loading=\"lazy\" decoding=\"async\" draggable=\"false\" class=\"coveredImage-noScale\"></img>\n                        <div id=\"").concat(eleIds.searchApiSource, "\" class=\"").concat(classes.embyFieldDesc, "\" style=\"margin-top: 0.5em;\">\n                        </div>\n                    </div>\n                </div>\n            </div>\n            <div hidden>\n                <label class=\"").concat(classes.embyLabel, "\" id=\"").concat(eleIds.danmakuRemark, "\"></label>\n            </div>\n            <div>\n                <h4>\u5339\u914D\u6E90</h4>\n                <div style=\"display: flex; justify-content: space-between; align-items: center;\">\n                    <div>\n                        <div id=\"").concat(eleIds.currentMatchedDiv, "\">\n                            <label class=\"").concat(classes.embyLabel, "\">\u5F39\u5F39 play \u603B\u91CF: ").concat(comments.length, "</label>\n                        </div>\n                        <label class=\"").concat(classes.embyLabel, "\">\u5F39\u5F39 play \u9644\u52A0\u7684\u7B2C\u4E09\u65B9 url: </label>\n                    </div>\n                    <button is=\"emby-button\" type=\"button\"\n                        class=\"").concat(classes.embyButtons.basic, "\" id=\"").concat(eleIds.clearLocalMatchCacheBtn, "\">\n                        \u6E05\u9664\u672C\u5730\u5339\u914D\u7F13\u5B58\n                    </button>\n                </div>\n                <div id=\"").concat(eleIds.extUrlsDiv, "\"></div>\n            </div>\n            <div is=\"emby-collapse\" title=\"\u9644\u52A0\u5F39\u5E55\">\n                <div class=\"").concat(classes.collapseContentNav, "\">\n                    <label class=\"").concat(classes.embyLabel, "\">\u5F39\u5F39 play \u652F\u6301\u89E3\u6790\u7684\u7B2C\u4E09\u65B9 url: </label>\n                    <div id=\"").concat(eleIds.extCommentSearchDiv, "\" style=\"display: flex;\"></div>\n                    <div class=\"").concat(classes.embyFieldDesc, "\">\n                        \u539F\u63A5\u53E3\u6587\u6863\u8BF4\u660E\u652F\u6301(\u5982A/B/C\u7AD9),\u81EA\u6D4B\u53E6\u5916\u652F\u6301[ \u7231\u5947\u827A\u89C6\u9891, \u817E\u8BAF\u89C6\u9891, \u4F18\u9177\u89C6\u9891, ],\u4E0D\u652F\u6301[ \u8292\u679C TV, ]\n                    </div>\n                    <div class=\"").concat(classes.embyFieldDesc, "\">\n                        \u4EC5[ \u7231\u5947\u827A\u89C6\u9891, ]\u9700\u8981\u6CE8\u610F\u7F51\u5740\u540E\u4E0D\u80FD\u5E26 ? \u7684\u53C2\u6570,\u5176\u4F59\u7F51\u5740\u5E26\u4E0D\u5E26\u90FD\u53EF\u4EE5\n                    </div>\n                    <div class=\"").concat(classes.embyFieldDesc, "\">\n                        \u8BE6\u7EC6\u7F51\u5740\u793A\u4F8B: \u5F39\u5F39 play PC \u5B98\u65B9\u5BA2\u6237\u7AEF -> \u6DFB\u52A0\u66F4\u591A\u5F39\u5E55 -> \u67E5\u770B\u652F\u6301\u89E3\u6790\u7684\u7F51\u5740\u793A\u4F8B\n                    </div>\n                </div>\n            </div>\n            <div is=\"emby-collapse\" title=\"\u670D\u52A1\u7AEF Danmu \u63D2\u4EF6\">\n                <div class=\"").concat(classes.collapseContentNav, "\">\n                    <div id=\"").concat(eleIds.danmuPluginDiv, "\" class=\"").concat(classes.embyCheckboxList, "\" style=\"").concat(styles.embyCheckboxList, "\"></div>\n                </div>\n            </div>\n            <div is=\"emby-collapse\" title=\"API\u9009\u62E9\u3001\u81EA\u5B9A\u4E49API\u914D\u7F6E\">\n                <div class=\"").concat(classes.collapseContentNav, "\">\n                    <div id=\"").concat(eleIds.apiCheckboxListDiv, "\" class=\"").concat(classes.embyCheckboxList, "\" style=\"").concat(styles.embyCheckboxList, " align-items: center;\">\n                    </div>\n                    <label class=\"").concat(classes.embyLabel, "\">").concat(lsKeys.apiPriority.name, ": </label>\n                    <div id=\"").concat(eleIds.apiPriorityDiv, "\" style=\"margin: 1% 0;\">\n                    </div>\n                    <label class=\"").concat(classes.embyLabel, "\">").concat(lsKeys.customApiPrefix.name, ": </label>\n                    <div id=\"").concat(eleIds.customApiPrefixInputDiv, "\" style=\"display: flex;\">\n                    </div>\n                    <div class=\"").concat(classes.embyFieldDesc, "\">\n                        \u5982\u9700\u81EA\u5B9A\u4E49\u5F39\u5E55API\u5730\u5740,\u8BF7\u586B\u5199\u5B8C\u6574URL(\u5982 https://api.example.com ),<br>\u7559\u7A7A\u5219\u4F7F\u7528\u539F\u751FAPI\n                    </div>\n                </div>\n            </div>\n        </div>\n    ");
+    container.innerHTML = template.trim();
+    buildSearchEpisodeEle();
+    buildExtCommentDiv();
+    buildDanmuPluginDiv();
+    bindManualMatchButtons();
+    buildCustomApiDiv();
   }
 
   /**
