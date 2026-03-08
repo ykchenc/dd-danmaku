@@ -3691,13 +3691,14 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
     }
     window.ede.loading = true;
     var buildCurrentDanmakuInfoFn = hooks.buildCurrentDanmakuInfo || function () {};
+    var appendvideoOsdDanmakuInfoFn = hooks.appendvideoOsdDanmakuInfo || function () {};
     if (lsGetItem(lsKeys.useFetchPluginXml.id)) {
       getMapByEmbyItemInfo().then(function (itemInfoMap) {
         return getCommentsByPluginApi(window.ede.itemId).then(function (comments) {
           if ((comments === null || comments === void 0 ? void 0 : comments.length) > 0) {
             return createDanmaku(comments, {
               buildCurrentDanmakuInfo: buildCurrentDanmakuInfoFn,
-              appendvideoOsdDanmakuInfo: function appendvideoOsdDanmakuInfo() {}
+              appendvideoOsdDanmakuInfo: appendvideoOsdDanmakuInfoFn
             }).then(function () {
               window.ede.loading = false;
               var ctr = getById(eleIds.danmakuCtr);
@@ -3722,8 +3723,8 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
   async function loadOnlineDanmaku(loadType) {
     var hooks = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
     var buildCurrentDanmakuInfoFn = hooks.buildCurrentDanmakuInfo || function () {};
-    var appendvideoOsdDanmakuInfo = function appendvideoOsdDanmakuInfo() {};
-    getEpisodeInfo(loadType !== LOAD_TYPE.SEARCH, appendvideoOsdDanmakuInfo).then(function (info) {
+    var appendvideoOsdDanmakuInfoFn = hooks.appendvideoOsdDanmakuInfo || function () {};
+    getEpisodeInfo(loadType !== LOAD_TYPE.SEARCH, appendvideoOsdDanmakuInfoFn).then(function (info) {
       return new Promise(function (resolve, reject) {
         var _window$ede4, _window$ede5;
         if (!info) {
@@ -3743,7 +3744,7 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
         if (loadType === LOAD_TYPE.RELOAD && (_window$ede6 = window.ede) !== null && _window$ede6 !== void 0 && (_window$ede6 = _window$ede6.danmuCache) !== null && _window$ede6 !== void 0 && _window$ede6[episodeId]) {
           createDanmaku(window.ede.danmuCache[episodeId], {
             buildCurrentDanmakuInfo: buildCurrentDanmakuInfoFn,
-            appendvideoOsdDanmakuInfo: function appendvideoOsdDanmakuInfo() {}
+            appendvideoOsdDanmakuInfo: appendvideoOsdDanmakuInfoFn
           }).catch(console.log);
         } else {
           fetchComment(episodeId).then(function (comments) {
@@ -3751,7 +3752,7 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
             window.ede.danmuCache[episodeId] = comments;
             createDanmaku(comments, {
               buildCurrentDanmakuInfo: buildCurrentDanmakuInfoFn,
-              appendvideoOsdDanmakuInfo: function appendvideoOsdDanmakuInfo() {}
+              appendvideoOsdDanmakuInfo: appendvideoOsdDanmakuInfoFn
             }).catch(console.log);
           });
         }

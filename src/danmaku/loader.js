@@ -180,7 +180,7 @@ export function loadDanmaku(loadType = LOAD_TYPE.CHECK, hooks = {}) {
     window.ede.loading = true;
 
     const buildCurrentDanmakuInfoFn = hooks.buildCurrentDanmakuInfo || (() => {});
-    const appendvideoOsdDanmakuInfo = () => {};
+    const appendvideoOsdDanmakuInfoFn = hooks.appendvideoOsdDanmakuInfo || (() => {});
 
     if (lsGetItem(lsKeys.useFetchPluginXml.id)) {
         getMapByEmbyItemInfo()
@@ -189,7 +189,7 @@ export function loadDanmaku(loadType = LOAD_TYPE.CHECK, hooks = {}) {
                     if (comments?.length > 0) {
                         return createDanmaku(comments, {
                             buildCurrentDanmakuInfo: buildCurrentDanmakuInfoFn,
-                            appendvideoOsdDanmakuInfo: () => {},
+                            appendvideoOsdDanmakuInfo: appendvideoOsdDanmakuInfoFn,
                         }).then(() => {
                             window.ede.loading = false;
                             const ctr = getById(eleIds.danmakuCtr);
@@ -212,9 +212,9 @@ export function loadDanmaku(loadType = LOAD_TYPE.CHECK, hooks = {}) {
  */
 export async function loadOnlineDanmaku(loadType, hooks = {}) {
     const buildCurrentDanmakuInfoFn = hooks.buildCurrentDanmakuInfo || (() => {});
-    const appendvideoOsdDanmakuInfo = () => {};
+    const appendvideoOsdDanmakuInfoFn = hooks.appendvideoOsdDanmakuInfo || (() => {});
 
-    getEpisodeInfo(loadType !== LOAD_TYPE.SEARCH, appendvideoOsdDanmakuInfo)
+    getEpisodeInfo(loadType !== LOAD_TYPE.SEARCH, appendvideoOsdDanmakuInfoFn)
         .then((info) => {
             return new Promise((resolve, reject) => {
                 if (!info) {
@@ -242,7 +242,7 @@ export async function loadOnlineDanmaku(loadType, hooks = {}) {
                     if (loadType === LOAD_TYPE.RELOAD && window.ede?.danmuCache?.[episodeId]) {
                         createDanmaku(window.ede.danmuCache[episodeId], {
                             buildCurrentDanmakuInfo: buildCurrentDanmakuInfoFn,
-                            appendvideoOsdDanmakuInfo: () => {},
+                            appendvideoOsdDanmakuInfo: appendvideoOsdDanmakuInfoFn,
                         }).catch(console.log);
                     } else {
                         fetchComment(episodeId).then((comments) => {
@@ -250,7 +250,7 @@ export async function loadOnlineDanmaku(loadType, hooks = {}) {
                             window.ede.danmuCache[episodeId] = comments;
                             createDanmaku(comments, {
                                 buildCurrentDanmakuInfo: buildCurrentDanmakuInfoFn,
-                                appendvideoOsdDanmakuInfo: () => {},
+                                appendvideoOsdDanmakuInfo: appendvideoOsdDanmakuInfoFn,
                             }).catch(console.log);
                         });
                     }
