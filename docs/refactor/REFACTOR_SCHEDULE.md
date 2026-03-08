@@ -2,7 +2,7 @@
 
 > 分支：`feature/modular-refactor`  
 > 创建日期：2025-03-08  
-> 状态：待执行
+> 状态：阶段 2 已完成
 
 > **注意**：改造过程中**请勿修改原有实现逻辑**，仅做代码迁移与模块拆分，不改变业务行为。
 
@@ -67,6 +67,8 @@
 | 2.7 | 抽取 core/AppLogAspect.js | AppLogAspect 类定义 | AppLogAspect.js |
 
 **验收**：storage 依赖 config，EDE/AppLogAspect 依赖 storage，utils 无内部循环依赖
+
+**阶段 2 完成情况**：已完成 2.1–2.7。lsGetItem、lsGetKeyById 保留于 config/api.js；helpers.js 暂仅含 objectEntries，getValueOrInvoke、getSettingsJson、settingsReset 待阶段 4 UI 迁移时补充；destroyAllInterval 置于 core/index.js
 
 ---
 
@@ -174,3 +176,4 @@
 |------|----------|
 | 2025-03-08 | 初版创建 |
 | 2025-03-08 | 明确 eleIds、lsKeys、lsLocalKeys 聚合成 3 个独立 config 文件；新增计划细化建议 |
+| 2025-03-08 | 阶段 2 完成：core/storage、utils（dom/fetch/platform/helpers）、core/EDE、core/AppLogAspect |
