@@ -3,7 +3,13 @@
  */
 
 export { onPlaybackStart, onPlaybackStop, onPlaybackStopPct } from './playback.js';
-export { onVideoOsdShow, onVideoOsdHide, addHeaderClock, removeHeaderClock } from './video-osd.js';
+export {
+    onVideoOsdShow,
+    onVideoOsdHide,
+    addHeaderClock,
+    removeHeaderClock,
+    appendvideoOsdDanmakuInfo,
+} from './video-osd.js';
 export { onViewShow, beforeDestroy } from './view.js';
 export { addEasterEggListener, quickDebug, checkRuntimeVars } from './easter-egg.js';
 export { playbackEventsRefresh, refreshEventListener } from './emby-events.js';

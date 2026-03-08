@@ -14,6 +14,7 @@ import { iconKeys } from '../config/icons.js';
 import { classes } from '../config/icons.js';
 import { styles } from '../config/icons.js';
 import {
+    check_interval,
     mediaContainerQueryStr,
     setMediaContainerQueryStr,
     notHide,
@@ -93,7 +94,9 @@ export function initUI() {
             });
             console.log('UI初始化完成');
         },
-        0
+        0,
+        check_interval,
+        window.ede?.destroyIntervalIds
     );
 }
 

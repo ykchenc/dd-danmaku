@@ -14,11 +14,12 @@ export {
 
 /**
  * 清理所有由 waitForElement 创建的 interval
- * @param {EDE} ede - EDE 实例
+ * @param {EDE} [ede] - EDE 实例，不传时使用 window.ede
  */
 export function destroyAllInterval(ede) {
-    if (ede && ede.destroyIntervalIds) {
-        ede.destroyIntervalIds.forEach((id) => clearInterval(id));
-        ede.destroyIntervalIds = [];
+    const target = ede ?? window.ede;
+    if (target?.destroyIntervalIds) {
+        target.destroyIntervalIds.forEach((id) => clearInterval(id));
+        target.destroyIntervalIds = [];
     }
 }

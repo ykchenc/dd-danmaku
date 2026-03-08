@@ -1247,14 +1247,15 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
 
   /**
    * 清理所有由 waitForElement 创建的 interval
-   * @param {EDE} ede - EDE 实例
+   * @param {EDE} [ede] - EDE 实例，不传时使用 window.ede
    */
   function destroyAllInterval(ede) {
-    if (ede && ede.destroyIntervalIds) {
-      ede.destroyIntervalIds.forEach(function (id) {
+    var target = ede !== null && ede !== void 0 ? ede : window.ede;
+    if (target !== null && target !== void 0 && target.destroyIntervalIds) {
+      target.destroyIntervalIds.forEach(function (id) {
         return clearInterval(id);
       });
-      ede.destroyIntervalIds = [];
+      target.destroyIntervalIds = [];
     }
   }
 
@@ -4065,6 +4066,7 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
    * 初始化播放页弹幕按钮等 UI
    */
   function initUI() {
+    var _window$ede3;
     if (getById(eleIds.danmakuCtr)) return;
     console.log('正在初始化UI');
     if (typeof ApiClient !== 'undefined' && parseFloat(ApiClient.serverVersion()) < 4.8) {
@@ -4096,7 +4098,7 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
         menubar.appendChild(embyButton(opt, opt.onClick));
       });
       console.log('UI初始化完成');
-    }, 0);
+    }, 0, check_interval, (_window$ede3 = window.ede) === null || _window$ede3 === void 0 ? void 0 : _window$ede3.destroyIntervalIds);
   }
 
   /**
@@ -4108,8 +4110,8 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
     var handlers = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
     var _media = document.querySelector(mediaQueryStr);
     if (!_media) {
-      var _window$ede3;
-      if ((_window$ede3 = window.ede) !== null && _window$ede3 !== void 0 && _window$ede3.episode_info) window.ede.episode_info = null;
+      var _window$ede4;
+      if ((_window$ede4 = window.ede) !== null && _window$ede4 !== void 0 && _window$ede4.episode_info) window.ede.episode_info = null;
       return;
     }
     if (_media.getAttribute('ede_listening')) return;
@@ -4247,8 +4249,41 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
   /**
    * 播放 OSD 显示/隐藏事件
    */
-  function addHeaderClock() {
+
+  /**
+   * 播放界面右下角显示弹幕信息（弹幕：xxx条 / 未匹配）
+   * 从 ede.js 4116-4140 行迁移
+   * @param {number} [loadSum] - 已加载弹幕数量，不传时从 window.ede 计算
+   */
+  function appendvideoOsdDanmakuInfo(loadSum) {
     var _window$ede;
+    if (!lsGetItem(lsKeys.osdTitleEnable.id)) return;
+    var episode_info = ((_window$ede = window.ede) === null || _window$ede === void 0 ? void 0 : _window$ede.episode_info) || {};
+    var episodeId = episode_info.episodeId,
+      animeTitle = episode_info.animeTitle,
+      episodeTitle = episode_info.episodeTitle;
+    var videoOsdContainer = document.querySelector("".concat(mediaContainerQueryStr, " .videoOsdSecondaryText"));
+    var videoOsdDanmakuTitle = getById(eleIds.videoOsdDanmakuTitle, videoOsdContainer);
+    if (!videoOsdDanmakuTitle) {
+      videoOsdDanmakuTitle = document.createElement('h3');
+      videoOsdDanmakuTitle.id = eleIds.videoOsdDanmakuTitle;
+      videoOsdDanmakuTitle.classList.add(classes.videoOsdTitle);
+      videoOsdDanmakuTitle.style.cssText = 'margin-left: auto; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; position: absolute; right: 0px; bottom: 0px;';
+    }
+    var text = '弹幕：';
+    if (episodeId) {
+      var count = loadSum !== null && loadSum !== void 0 ? loadSum : window.ede ? getDanmakuComments(window.ede).length : 0;
+      text += "".concat(animeTitle, " - ").concat(episodeTitle, " - ").concat(count, "\u6761");
+    } else {
+      text += '未匹配';
+    }
+    videoOsdDanmakuTitle.innerText = text;
+    if (videoOsdContainer) {
+      videoOsdContainer.append(videoOsdDanmakuTitle);
+    }
+  }
+  function addHeaderClock() {
+    var _window$ede2;
     var warpper = getByClass('headerMiddle');
     var headerClockEle = getById('headerClock');
     if (!warpper) return;
@@ -4265,7 +4300,7 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
     }
     updateClock();
     var intervalId = setInterval(updateClock, 1000);
-    if ((_window$ede = window.ede) !== null && _window$ede !== void 0 && _window$ede.destroyIntervalIds) {
+    if ((_window$ede2 = window.ede) !== null && _window$ede2 !== void 0 && _window$ede2.destroyIntervalIds) {
       window.ede.destroyIntervalIds.push(intervalId);
     }
   }
@@ -4476,7 +4511,8 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
         refreshEventListener: refreshEventListener,
         loadDanmaku: function loadDanmaku$1(type) {
           return loadDanmaku(type, {
-            buildCurrentDanmakuInfo: buildCurrentDanmakuInfo
+            buildCurrentDanmakuInfo: buildCurrentDanmakuInfo,
+            appendvideoOsdDanmakuInfo: appendvideoOsdDanmakuInfo
           });
         }
       });

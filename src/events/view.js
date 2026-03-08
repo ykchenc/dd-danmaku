@@ -11,7 +11,7 @@ import { initUI, initListener, initCss } from '../ui/init.js';
 import { customeUrl } from '../config/custome-url.js';
 import { addEasterEggListener, quickDebug } from './easter-egg.js';
 import { onPlaybackStart, onPlaybackStop } from './playback.js';
-import { onVideoOsdShow, onVideoOsdHide } from './video-osd.js';
+import { onVideoOsdShow, onVideoOsdHide, appendvideoOsdDanmakuInfo } from './video-osd.js';
 import { playbackEventsRefresh, refreshEventListener } from './emby-events.js';
 import { loadDanmaku } from '../danmaku/loader.js';
 import { buildCurrentDanmakuInfo } from '../ui/tabs/info.js';
@@ -60,7 +60,11 @@ export function onViewShow(e) {
             onVideoOsdHide,
             playbackEventsRefresh,
             refreshEventListener,
-            loadDanmaku: (type) => loadDanmaku(type, { buildCurrentDanmakuInfo }),
+            loadDanmaku: (type) =>
+                loadDanmaku(type, {
+                    buildCurrentDanmakuInfo,
+                    appendvideoOsdDanmakuInfo,
+                }),
         });
         initCss();
     }
