@@ -68,7 +68,7 @@
 
 **验收**：storage 依赖 config，EDE/AppLogAspect 依赖 storage，utils 无内部循环依赖
 
-**阶段 2 完成情况**：已完成 2.1–2.7。lsGetItem、lsGetKeyById 保留于 config/api.js；helpers.js 暂仅含 objectEntries，getValueOrInvoke、getSettingsJson、settingsReset 待阶段 4 UI 迁移时补充；destroyAllInterval 置于 core/index.js
+**阶段 2 完成情况**：已完成 2.1–2.7。lsGetItem、lsGetKeyById 保留于 config/api.js；helpers.js 已含 objectEntries、getValueOrInvoke、getSettingsJson、settingsReset（阶段 4 时补充）；destroyAllInterval 置于 core/index.js
 
 ---
 
@@ -89,6 +89,8 @@
 | 3.11 | 抽取 danmaku/toast.js | toastByDanmaku | toast.js |
 
 **验收**：match 与 danmaku 模块可独立导入，依赖关系清晰
+
+**阶段 3 完成情况**：已完成 3.1–3.11。match 拆分为 search、similarity、fallback、hash、tmdb、episode、emby-item、get-episode-info；loader.js 含 loadDanmaku、loadOnlineDanmaku、createDanmaku、getCommentsByPluginApi；refreshPluginXml 未迁移（原版 lsKeys 中已注释禁用）
 
 ---
 
@@ -164,6 +166,7 @@
 - build 产出：ede.js、ede.min.js、ede.user.js、ede.user.min.js、ede.android9.js、ede.android7.js
 - docs/refactor/BUILD.md：构建说明
 - README.md：开发/构建 section
+- 6.3 功能回归测试、6.4 多端验证：需人工在实机/实环境中验证，无单独产出文档
 
 ---
 
@@ -203,3 +206,4 @@
 | 2025-03-08 | 阶段 4 完成：ui/tabs（setting、search、info、pro、about）、ui/init.js、match/emby-item.js、dialog 集成 afterEmbyDialogCreated |
 | 2025-03-08 | 阶段 5 完成：events 模块、loadDanmaku、getEpisodeInfo、customeUrl、index 组装 |
 | 2025-03-08 | 阶段 6 完成：rollup 油猴头、Danmaku 内联、babel android、BUILD.md、README 更新 |
+| 2025-03-08 | 阶段 6 后修复：initH5VideoAdapter、videoTimeUpdateInterval、appendvideoOsdDanmakuInfo、waitForElement+destroyIntervalIds、destroyAllInterval 无参、loader.js hooks、addExtCommentsForLoad hooks；danmaku-inline.js 精简为仅 Danmaku UMD |
