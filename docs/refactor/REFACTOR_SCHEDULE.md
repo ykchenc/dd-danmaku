@@ -1,0 +1,154 @@
+# ede.js 模块化改造计划编排
+
+> 分支：`refactor/modularization`  
+> 创建日期：2025-03-08  
+> 状态：待执行
+
+---
+
+## 总览
+
+| 阶段 | 名称 | 预估周期 | 依赖 |
+|------|------|----------|------|
+| 阶段 0 | 环境准备 | 1 天 | - |
+| 阶段 1 | 配置与基础模块 | 2–3 天 | 阶段 0 |
+| 阶段 2 | 核心与工具模块 | 2 天 | 阶段 1 |
+| 阶段 3 | 匹配与弹幕模块 | 3–4 天 | 阶段 2 |
+| 阶段 4 | Bangumi 与 UI 模块 | 3–4 天 | 阶段 3 |
+| 阶段 5 | 事件与入口整合 | 2 天 | 阶段 4 |
+| 阶段 6 | 构建与验证 | 2–3 天 | 阶段 5 |
+
+**总预估**：约 15–19 个工作日（3–4 周）
+
+---
+
+## 阶段 0：环境准备
+
+| 序号 | 任务 | 说明 | 产出 |
+|------|------|------|------|
+| 0.1 | 安装 Rollup 及插件 | rollup、@rollup/plugin-node-resolve、@rollup/plugin-commonjs、@rollup/plugin-babel、rollup-plugin-terser | package.json 更新 |
+| 0.2 | 创建 src 目录结构 | 按 REFACTOR_PLAN 建立 config、core、match、danmaku、bangumi、ui、utils、events、vendor | 空目录骨架 |
+| 0.3 | 配置 rollup.config.js | 入口、输出 IIFE、babel 集成、sourcemap | rollup.config.js |
+| 0.4 | 配置 npm scripts | build、build:dev、build:prod | package.json scripts |
+
+---
+
+## 阶段 1：配置与基础模块
+
+| 序号 | 任务 | 说明 | 产出 |
+|------|------|------|------|
+| 1.1 | 抽取 config/constants.js | check_interval、LOAD_TYPE、mediaQueryStr、mediaContainerQueryStr、notHide 等 | constants.js |
+| 1.2 | 抽取 config/ls-keys.js | lsKeys、lsLocalKeys 完整定义 | ls-keys.js |
+| 1.3 | 抽取 config/ele-ids.js | eleIds 完整定义 | ele-ids.js |
+| 1.4 | 抽取 config/icons.js | iconKeys、classes、styles、timeOffsetBtns、danmakuEngineOpts 等 | icons.js |
+| 1.5 | 抽取 config/options.js | danmakuTabOpts、danmakuTypeFilterOpts、danmakuSource、danmuListOpts、apiPriorityOpts 等 | options.js |
+| 1.6 | 抽取 config/api.js | openSourceLicense、dandanplayApi、dandanplayApiCustom、bangumiApi（注意 prefix getter 与 lsGetItem 的循环依赖） | api.js |
+| 1.7 | 抽取 user-config.js | requireDanmakuPath、corsProxy 及用户可修改配置 | user-config.js |
+
+**验收**：各 config 模块可独立 import，无循环依赖
+
+---
+
+## 阶段 2：核心与工具模块
+
+| 序号 | 任务 | 说明 | 产出 |
+|------|------|------|------|
+| 2.1 | 抽取 core/storage.js | lsGetItem、lsSetItem、lsBatchSet、lsBatchRemove、lsGetKeyById、lsCheckOld、lsCheckSet | storage.js |
+| 2.2 | 抽取 utils/dom.js | getById、getByClass、getTargetInput、waitForElement | dom.js |
+| 2.3 | 抽取 utils/fetch.js | fetchJson | fetch.js |
+| 2.4 | 抽取 utils/platform.js | OS 对象（isAndroid、isIOS、isMacOS 等） | platform.js |
+| 2.5 | 抽取 utils/helpers.js | objectEntries、getValueOrInvoke、getApiTl、getSettingsJson、settingsReset | helpers.js |
+| 2.6 | 抽取 core/EDE.js | EDE 类定义 | EDE.js |
+| 2.7 | 抽取 core/AppLogAspect.js | AppLogAspect 类定义 | AppLogAspect.js |
+
+**验收**：storage 依赖 config，EDE/AppLogAspect 依赖 storage，utils 无内部循环依赖
+
+---
+
+## 阶段 3：匹配与弹幕模块
+
+| 序号 | 任务 | 说明 | 产出 |
+|------|------|------|------|
+| 3.1 | 抽取 match/search.js | fetchSearchEpisodes、fetchSearchEpisodesByTmdbId、fetchComment、fetchExtcommentActual | search.js |
+| 3.2 | 抽取 match/similarity.js | normalizeTitle、parseSearchKeyword、calculateStringSimilarity、extractKeywords | similarity.js |
+| 3.3 | 抽取 match/fallback.js | selectBestMatch、calculateMatchScore、autoFailback、tmdbAutoFailback、oriTitleAutoFailback、movieAutoFailback | fallback.js |
+| 3.4 | 抽取 match/hash.js | calculateFileHash、fetchMatchApi | hash.js |
+| 3.5 | 抽取 match/tmdb.js | tryMatchByTmdbId、filterMainEpisodes | tmdb.js |
+| 3.6 | 抽取 match/episode.js | getMapByEmbyItemInfo、searchEpisodes、getEpisodeInfo、lsSeasonSearchEpisodes、parseAnimeName | episode.js |
+| 3.7 | 抽取 danmaku/loader.js | loadDanmaku、loadOnlineDanmaku、createDanmaku、getCommentsByPluginApi、refreshPluginXml | loader.js |
+| 3.8 | 抽取 danmaku/filter.js | danmakuFilter、danmakuAutoFilter、danmakuAutoFilterCancel、danmakuTypeFilter、danmakuSourceFilter、danmakuDensityLevelFilter、danmakuKeywordsFilter、danmakuMergeSimilar、similarityPercentage | filter.js |
+| 3.9 | 抽取 danmaku/parser.js | danmakuParser、getCommentStyle | parser.js |
+| 3.10 | 抽取 danmaku/chart.js | buildProgressBarChart | chart.js |
+| 3.11 | 抽取 danmaku/toast.js | toastByDanmaku | toast.js |
+
+**验收**：match 与 danmaku 模块可独立导入，依赖关系清晰
+
+---
+
+## 阶段 4：Bangumi 与 UI 模块
+
+| 序号 | 任务 | 说明 | 产出 |
+|------|------|------|------|
+| 4.1 | 抽取 bangumi/api.js | getEpisodeBangumiRel、putBangumiEpStatus、offsetBgmEpisodeIndex | api.js |
+| 4.2 | 抽取 bangumi/characters.js | renderBangumiCharacters（从 buildExtInfo 中拆出） | characters.js |
+| 4.3 | 抽取 ui/components/common.js | getById、getByClass、embyImg、embyALink、embyImgButton | common.js |
+| 4.4 | 抽取 ui/components/inputs.js | embyInput、embyTextarea、embySelect、getTargetInput | inputs.js |
+| 4.5 | 抽取 ui/components/buttons.js | embyButton | buttons.js |
+| 4.6 | 抽取 ui/components/layout.js | embyTabs、embyCheckbox、embyCheckboxList、embySlider | layout.js |
+| 4.7 | 抽取 ui/dialog.js | createDialog、afterEmbyDialogCreated、embyDialog、closeEmbyDialog、embyAlert、embyToast | dialog.js |
+| 4.8 | 抽取 ui/tabs/setting.js | buildDanmakuSetting、buildSettingsBackup、buildFontStyleSetting、buildFontFamilySetting、buildFontFamilyCtrl、resetFontFamilyDiv、loadLocalFont、changeFontStylePreview | setting.js |
+| 4.9 | 抽取 ui/tabs/search.js | buildSearchEpisode、buildSearchEpisodeEle、buildExtCommentDiv、buildExtUrlsDiv、buildCustomApiDiv、buildDanmuPluginDiv、bindManualMatchButtons、onEnterExtComment、addExtComments | search.js |
+| 4.10 | 抽取 ui/tabs/info.js | buildCurrentDanmakuInfo、buildDanmuListDiv、buildExtInfo | info.js |
+| 4.11 | 抽取 ui/tabs/pro.js | buildProSetting、buildDanmakuFilterSetting、buildExtSetting、buildOsdSetting、buildPlaySetting、buildBangumiSetting、buildCustomUrlSetting、onEnterBangumiToken、fetchBangumiApiGetMe | pro.js |
+| 4.12 | 抽取 ui/tabs/about.js | buildAbout、buildConsoleLog、buildDebugCheckbox、buildDebugButton、buildOpenSourceLicense、buildIframe、generateRandomDanmu | about.js |
+| 4.13 | 抽取 ui/init.js | initUI、initListener、initCss | init.js |
+
+**验收**：UI 模块可正确渲染各 Tab，无样式与事件丢失
+
+---
+
+## 阶段 5：事件与入口整合
+
+| 序号 | 任务 | 说明 | 产出 |
+|------|------|------|------|
+| 5.1 | 抽取 events/playback.js | onPlaybackStart、onPlaybackStop、onPlaybackStopPct | playback.js |
+| 5.2 | 抽取 events/video-osd.js | onVideoOsdShow、onVideoOsdHide | video-osd.js |
+| 5.3 | 抽取 events/view.js | onViewShow、beforeDestroy | view.js |
+| 5.4 | 抽取 events/easter-egg.js | addEasterEggListener、quickDebug、checkRuntimeVars | easter-egg.js |
+| 5.5 | 处理 vendor/danmaku | 内联 Danmaku 或通过 rollup 插件注入 | danmaku-inline.js 或插件 |
+| 5.6 | 编写 src/index.js | 组装所有模块，保留 IIFE 包装，注入油猴头 | index.js |
+| 5.7 | 处理 customeUrl、mediaBtnOpts 等 | 确保初始化顺序正确 | index.js |
+
+**验收**：index.js 可成功打包，无未定义引用
+
+---
+
+## 阶段 6：构建与验证
+
+| 序号 | 任务 | 说明 | 产出 |
+|------|------|------|------|
+| 6.1 | 完善 rollup 配置 | 处理 Emby 全局、油猴头注入、sourcemap | rollup.config.js |
+| 6.2 | 集成现有 babel 流程 | 对 dist/ede.js 执行 android7/android9 转译 | package.json |
+| 6.3 | 功能回归测试 | 油猴、index.html、CustomCssJS 三种方式加载 | 测试报告 |
+| 6.4 | 多端验证 | Web、Android、iOS、Emby Theater 等 | 兼容性记录 |
+| 6.5 | 更新 README/贡献指南 | 说明 build 步骤、目录结构 | 文档更新 |
+| 6.6 | 清理旧 ede.js | 保留为备份或归档，主入口改为 dist/ede.js | 仓库整理 |
+
+**验收**：构建产物功能与改造前一致，文档完整
+
+---
+
+## 执行建议
+
+1. **按阶段推进**：每阶段完成后做一次小范围验证，避免问题累积
+2. **分支策略**：在 `refactor/modularization` 下可按阶段建子分支，如 `refactor/phase-1-config`
+3. **细化任务**：每个任务可再拆为更小的 PR，便于 Code Review
+4. **依赖梳理**：阶段 1 完成后，可用工具（如 madge）检查模块依赖图，及时修正循环依赖
+
+---
+
+## 变更记录
+
+| 日期 | 变更内容 |
+|------|----------|
+| 2025-03-08 | 初版创建 |
