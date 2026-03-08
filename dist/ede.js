@@ -3646,6 +3646,7 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
   }
   async function addExtCommentsForLoad(extUrl, extComments) {
     var _window$ede, _window$ede2, _extComments;
+    var hooks = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
     var episodeId = (_window$ede = window.ede) === null || _window$ede === void 0 || (_window$ede = _window$ede.episode_info) === null || _window$ede === void 0 ? void 0 : _window$ede.episodeId;
     var comments = ((_window$ede2 = window.ede) === null || _window$ede2 === void 0 || (_window$ede2 = _window$ede2.danmuCache) === null || _window$ede2 === void 0 ? void 0 : _window$ede2[episodeId]) || [];
     if (!extComments) {
@@ -3653,7 +3654,7 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
     }
     if (!((_extComments = extComments) !== null && _extComments !== void 0 && _extComments.length)) return;
     var allComments = comments.concat(extComments);
-    await createDanmaku(allComments).catch(function (err) {
+    await createDanmaku(allComments, hooks).catch(function (err) {
       return console.log(err);
     });
   }
@@ -3748,11 +3749,15 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
     }).then(function () {
       var _window$ede7, _window$ede8;
       var extCommentCache = ((_window$ede7 = window.ede) === null || _window$ede7 === void 0 || (_window$ede7 = _window$ede7.extCommentCache) === null || _window$ede7 === void 0 ? void 0 : _window$ede7[window.ede.itemId]) || {};
+      var hooks = {
+        buildCurrentDanmakuInfo: buildCurrentDanmakuInfoFn,
+        appendvideoOsdDanmakuInfo: appendvideoOsdDanmakuInfoFn
+      };
       objectEntries(extCommentCache).forEach(function (_ref) {
         var _ref2 = _slicedToArray(_ref, 2),
           key = _ref2[0],
           val = _ref2[1];
-        return addExtCommentsForLoad(key, val);
+        return addExtCommentsForLoad(key, val, hooks);
       });
       if ((_window$ede8 = window.ede) !== null && _window$ede8 !== void 0 && _window$ede8.episode_info) {
         window.ede.previous_episode_info = _objectSpread2({}, window.ede.episode_info);

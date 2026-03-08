@@ -152,7 +152,7 @@ export async function getCommentsByPluginApi(mediaServerItemId) {
     }
 }
 
-async function addExtCommentsForLoad(extUrl, extComments) {
+async function addExtCommentsForLoad(extUrl, extComments, hooks = {}) {
     const episodeId = window.ede?.episode_info?.episodeId;
     const comments = window.ede?.danmuCache?.[episodeId] || [];
     if (!extComments) {
@@ -160,7 +160,7 @@ async function addExtCommentsForLoad(extUrl, extComments) {
     }
     if (!extComments?.length) return;
     const allComments = comments.concat(extComments);
-    await createDanmaku(allComments).catch((err) => console.log(err));
+    await createDanmaku(allComments, hooks).catch((err) => console.log(err));
 }
 
 /**
@@ -262,8 +262,12 @@ export async function loadOnlineDanmaku(loadType, hooks = {}) {
         )
         .then(() => {
             const extCommentCache = window.ede?.extCommentCache?.[window.ede.itemId] || {};
+            const hooks = {
+                buildCurrentDanmakuInfo: buildCurrentDanmakuInfoFn,
+                appendvideoOsdDanmakuInfo: appendvideoOsdDanmakuInfoFn,
+            };
             objectEntries(extCommentCache).forEach(([key, val]) =>
-                addExtCommentsForLoad(key, val)
+                addExtCommentsForLoad(key, val, hooks)
             );
             if (window.ede?.episode_info) {
                 window.ede.previous_episode_info = { ...window.ede.episode_info };
