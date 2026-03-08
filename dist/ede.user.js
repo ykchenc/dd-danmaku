@@ -1,3 +1,17 @@
+// ==UserScript==
+// @name         Emby danmaku extension - Emby style
+// @description  Emby弹幕插件 - Emby风格
+// @namespace    https://github.com/chen3861229/dd-danmaku
+// @author       chen3861229
+// @version      1.47
+// @copyright    2022, RyoLee (https://github.com/RyoLee)
+// @license      MIT; https://raw.githubusercontent.com/RyoLee/emby-danmaku/master/LICENSE
+// @icon         https://github.githubassets.com/pinned-octocat.svg
+// @grant        none
+// @match        *://*/web/index.html
+// @match        *://*/web/
+// ==/UserScript==
+
 
 (function(){
 var skipInnerModule=false;

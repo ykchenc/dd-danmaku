@@ -2,7 +2,7 @@
 
 > 分支：`feature/modular-refactor`  
 > 创建日期：2025-03-08  
-> 状态：阶段 5 已完成
+> 状态：阶段 6 已完成
 
 > **注意**：改造过程中**请勿修改原有实现逻辑**，仅做代码迁移与模块拆分，不改变业务行为。
 
@@ -156,6 +156,15 @@
 
 **验收**：构建产物功能与改造前一致，文档完整
 
+**阶段 6 完成情况**：已完成 6.1–6.5；6.6 暂缓，ede.js 保留作参考
+- rollup.config.js：油猴头、Danmaku 内联、CustomCssJS 分支、sourcemap 输出
+- vendor/danmaku-inline.js：从 ede.js 提取 Danmaku UMD
+- babel.config.js：android7/android9 目标，BROWSERSLIST_ENV 驱动
+- package.json：build、build:android9、build:android7、build:all
+- build 产出：ede.js、ede.min.js、ede.user.js、ede.user.min.js、ede.android9.js、ede.android7.js
+- docs/refactor/BUILD.md：构建说明
+- README.md：开发/构建 section
+
 ---
 
 ## 计划细化建议
@@ -193,3 +202,4 @@
 | 2025-03-08 | 阶段 4 部分完成：bangumi/api、bangumi/characters、ui/components、ui/dialog；helpers 补充 getValueOrInvoke、getSettingsJson、settingsReset |
 | 2025-03-08 | 阶段 4 完成：ui/tabs（setting、search、info、pro、about）、ui/init.js、match/emby-item.js、dialog 集成 afterEmbyDialogCreated |
 | 2025-03-08 | 阶段 5 完成：events 模块、loadDanmaku、getEpisodeInfo、customeUrl、index 组装 |
+| 2025-03-08 | 阶段 6 完成：rollup 油猴头、Danmaku 内联、babel android、BUILD.md、README 更新 |
