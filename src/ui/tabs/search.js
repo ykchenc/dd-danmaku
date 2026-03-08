@@ -14,11 +14,18 @@ import { lsLocalKeys } from '../../config/ls-local-keys.js';
 import { lsBatchRemove } from '../../core/storage.js';
 import { apiPriorityOpts } from '../../config/options.js';
 import { corsProxy } from '../../user-config.js';
+import { appendvideoOsdDanmakuInfo } from '../../events/video-osd.js';
+import { buildCurrentDanmakuInfo } from './info.js';
 import { LOAD_TYPE } from '../../config/constants.js';
 import { fetchSearchEpisodes, fetchExtcommentActual } from '../../match/search.js';
 import { parseAnimeName, writeLsSeasonInfo } from '../../match/episode.js';
 import { createDanmaku, loadDanmaku } from '../../danmaku/loader.js';
 import { embyToast, closeEmbyDialog } from '../dialog.js';
+
+const createDanmakuHooks = {
+    buildCurrentDanmakuInfo,
+    appendvideoOsdDanmakuInfo,
+};
 
 async function doDanmakuSearchEpisode() {
     const embySearch = getById(eleIds.danmakuSearchName);
@@ -319,7 +326,7 @@ function buildSearchEpisodeEle() {
                     window.ede.episode_info.episodeId = null;
                 }
                 if (window.ede.danmaku) {
-                    createDanmaku([]);
+                    createDanmaku([], createDanmakuHooks);
                 }
                 const label = currentMatchedDiv.querySelector('label');
                 if (label) label.textContent = '弹弹 play 总量: 0';
@@ -343,7 +350,7 @@ function buildExtUrlsDiv() {
             embyButton({ label: '清空此加载', iconKey: iconKeys.close }, (e) => {
                 delete curExtCommentCache[key];
                 e.target.parentNode.remove();
-                createDanmaku(allComments.filter((c) => c.fromUrl !== key));
+                createDanmaku(allComments.filter((c) => c.fromUrl !== key), createDanmakuHooks);
             })
         );
         extUrlDiv.append(embyALink(key), document.createTextNode(` 总量: ${val.length}`));
@@ -372,7 +379,7 @@ async function addExtComments(extUrl, extComments) {
         return;
     }
     const allComments = comments.concat(extComments);
-    createDanmaku(allComments)
+    createDanmaku(allComments, createDanmakuHooks)
         .then(() => {
             const beforeLength = window.ede.commentsParsed.length - extComments.length;
             embyToast({
