@@ -16,9 +16,16 @@ import { mediaContainerQueryStr } from '../../config/constants.js';
 import { tabIframeId } from '../../config/options.js';
 import { LOAD_TYPE } from '../../config/constants.js';
 import { createDanmaku, loadDanmaku } from '../../danmaku/loader.js';
+import { appendvideoOsdDanmakuInfo } from '../../events/video-osd.js';
+import { buildCurrentDanmakuInfo } from './info.js';
 import { AppLogAspect } from '../../core/index.js';
 import { embyToast } from '../dialog.js';
 import { closeEmbyDialog } from '../dialog.js';
+
+const createDanmakuHooks = {
+    buildCurrentDanmakuInfo,
+    appendvideoOsdDanmakuInfo,
+};
 
 function doConsoleLogChange(checked) {
     lsSetItem(lsKeys.consoleLogEnable.id, checked);
@@ -184,7 +191,7 @@ function buildDebugCheckbox(container) {
                         return { ...c, p: values.join() };
                     });
                     console.log('已' + lsKeys.debugReverseDanmu.name);
-                    createDanmaku(modified);
+                    createDanmaku(modified, createDanmakuHooks);
                 }
             }
         )
@@ -207,7 +214,7 @@ function buildDebugCheckbox(container) {
             window.ede.commentsOriginal = comments;
             console.log('已还原' + lsKey.name);
         }
-        createDanmaku(comments);
+        createDanmaku(comments, createDanmakuHooks);
     };
     debugWrapper.append(
         embyCheckbox(
@@ -255,7 +262,7 @@ function buildDebugCheckbox(container) {
             window.ede.commentsOriginal = comments;
             console.log('已还原' + lsKey.name);
         }
-        createDanmaku(comments);
+        createDanmaku(comments, createDanmakuHooks);
     };
     debugWrapper.append(
         embyCheckbox(
@@ -402,7 +409,7 @@ function buildDebugCheckbox(container) {
                             media.currentTime += 100 / 1e3;
                             media.dispatchEvent(new Event('timeupdate'));
                         }, 100);
-                        createDanmaku(generateRandomDanmu(50000, 600))
+                        createDanmaku(generateRandomDanmu(50000, 600), createDanmakuHooks)
                             .then(() => console.log('弹幕就位'))
                             .catch((err) => console.log(err));
                     } else {
