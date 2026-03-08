@@ -15,6 +15,7 @@ import { onVideoOsdShow, onVideoOsdHide } from './video-osd.js';
 import { playbackEventsRefresh, refreshEventListener } from './emby-events.js';
 import { loadDanmaku } from '../danmaku/loader.js';
 import { buildCurrentDanmakuInfo } from '../ui/tabs/info.js';
+import { initH5VideoAdapter, videoTimeUpdateInterval } from './h5-video-adapter.js';
 
 /**
  * 退出播放页时清理
@@ -28,6 +29,7 @@ export function beforeDestroy(e) {
     const danmakuCtr = getById(eleIds.danmakuCtr);
     if (danmakuCtr) danmakuCtr.remove();
 
+    videoTimeUpdateInterval(null, false);
     destroyAllInterval();
     storageLsSetItem(lsKeys.timelineOffset.id, lsKeys.timelineOffset.defaultValue);
 }
@@ -50,6 +52,7 @@ export function onViewShow(e) {
             window.ede.appLogAspect = new AppLogAspect().init();
         }
         initUI();
+        initH5VideoAdapter();
         initListener({
             onPlaybackStart,
             onPlaybackStop,

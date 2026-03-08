@@ -7,3 +7,4 @@ export { onVideoOsdShow, onVideoOsdHide, addHeaderClock, removeHeaderClock } fro
 export { onViewShow, beforeDestroy } from './view.js';
 export { addEasterEggListener, quickDebug, checkRuntimeVars } from './easter-egg.js';
 export { playbackEventsRefresh, refreshEventListener } from './emby-events.js';
+export { initH5VideoAdapter, videoTimeUpdateInterval } from './h5-video-adapter.js';
