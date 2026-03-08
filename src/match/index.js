@@ -2,7 +2,7 @@
  * match 模块统一导出
  */
 
-export { fetchSearchEpisodes, fetchSearchEpisodesByTmdbId, fetchMatchApi } from './search.js';
+export { fetchSearchEpisodes, fetchSearchEpisodesByTmdbId, fetchMatchApi, fetchComment, fetchExtcommentActual } from './search.js';
 export {
     calculateStringSimilarity,
     similarityPercentage,
@@ -20,4 +20,5 @@ export {
 export { calculateFileHash, tryMatchByHash } from './hash.js';
 export { filterMainEpisodes, tryMatchByTmdbId } from './tmdb.js';
 export { parseAnimeName, lsSeasonSearchEpisodes, searchEpisodes } from './episode.js';
+export { getEpisodeInfo } from './get-episode-info.js';
 export { getMapByEmbyItemInfo } from './emby-item.js';

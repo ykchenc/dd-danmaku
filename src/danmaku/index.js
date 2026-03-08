@@ -15,4 +15,4 @@ export {
 export { danmakuParser, getCommentStyle } from './parser.js';
 export { buildProgressBarChart } from './chart.js';
 export { toastByDanmaku } from './toast.js';
-export { createDanmaku } from './loader.js';
+export { createDanmaku, loadDanmaku, loadOnlineDanmaku, getCommentsByPluginApi } from './loader.js';

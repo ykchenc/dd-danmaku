@@ -2,7 +2,7 @@
 
 > 分支：`feature/modular-refactor`  
 > 创建日期：2025-03-08  
-> 状态：阶段 4 已完成
+> 状态：阶段 5 已完成
 
 > **注意**：改造过程中**请勿修改原有实现逻辑**，仅做代码迁移与模块拆分，不改变业务行为。
 
@@ -134,6 +134,13 @@
 
 **验收**：index.js 可成功打包，无未定义引用
 
+**阶段 5 完成情况**：已完成 5.1–5.7
+- events/playback.js、video-osd.js、view.js、easter-egg.js、emby-events.js
+- danmaku/loader.js: loadDanmaku、loadOnlineDanmaku、getCommentsByPluginApi
+- match: getEpisodeInfo、fetchComment、fetchExtcommentActual
+- config/custome-url.js
+- index.js 组装 viewshow、viewbeforehide
+
 ---
 
 ## 阶段 6：构建与验证
@@ -185,3 +192,4 @@
 | 2025-03-08 | 阶段 2 完成：core/storage、utils（dom/fetch/platform/helpers）、core/EDE、core/AppLogAspect |
 | 2025-03-08 | 阶段 4 部分完成：bangumi/api、bangumi/characters、ui/components、ui/dialog；helpers 补充 getValueOrInvoke、getSettingsJson、settingsReset |
 | 2025-03-08 | 阶段 4 完成：ui/tabs（setting、search、info、pro、about）、ui/init.js、match/emby-item.js、dialog 集成 afterEmbyDialogCreated |
+| 2025-03-08 | 阶段 5 完成：events 模块、loadDanmaku、getEpisodeInfo、customeUrl、index 组装 |

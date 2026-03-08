@@ -18,6 +18,7 @@ import {
     setMediaContainerQueryStr,
     notHide,
     setVersionOld,
+    mediaQueryStr,
 } from '../config/constants.js';
 import { OS } from '../utils/platform.js';
 
@@ -97,18 +98,36 @@ export function initUI() {
 }
 
 /**
- * 初始化播放事件监听（占位，由 events 模块补全）
+ * 初始化播放事件监听
+ * @param {object} [handlers] - { onPlaybackStart, onPlaybackStop, onVideoOsdShow, onVideoOsdHide, playbackEventsRefresh, refreshEventListener, loadDanmaku }
  */
-export function initListener() {
-    const _media = document.querySelector('video');
+export function initListener(handlers = {}) {
+    const _media = document.querySelector(mediaQueryStr);
     if (!_media) {
         if (window.ede?.episode_info) window.ede.episode_info = null;
         return;
     }
     if (_media.getAttribute('ede_listening')) return;
     console.log('正在初始化Listener');
+
+    if (handlers.playbackEventsRefresh && handlers.onPlaybackStart) {
+        handlers.playbackEventsRefresh({ playbackstart: handlers.onPlaybackStart });
+    }
+    if (handlers.playbackEventsRefresh && handlers.onPlaybackStop) {
+        handlers.playbackEventsRefresh({ playbackstop: handlers.onPlaybackStop });
+    }
     _media.setAttribute('ede_listening', 'true');
+
+    if (handlers.refreshEventListener) {
+        if (handlers.onVideoOsdShow) handlers.refreshEventListener({ 'video-osd-show': handlers.onVideoOsdShow });
+        if (handlers.onVideoOsdHide) handlers.refreshEventListener({ 'video-osd-hide': handlers.onVideoOsdHide });
+    }
+
     console.log('Listener初始化完成');
+
+    if ((OS.isAndroidEmbyNoisyX?.() || OS.isEmbyUWP?.()) && handlers.loadDanmaku) {
+        handlers.loadDanmaku('init');
+    }
 }
 
 /**

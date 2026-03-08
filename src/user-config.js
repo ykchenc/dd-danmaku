@@ -7,3 +7,10 @@
 
 export let requireDanmakuPath = 'https://danmaku.7o7o.cc/danmaku.min.js';
 export let corsProxy = 'https://ddplay-api.7o7o.cc/cors/';
+
+export function setRequireDanmakuPath(v) {
+    requireDanmakuPath = v;
+}
+export function setCorsProxy(v) {
+    corsProxy = v;
+}

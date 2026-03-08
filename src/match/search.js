@@ -3,6 +3,7 @@
  */
 
 import { fetchJson } from '../utils/fetch.js';
+import { dandanplayApi } from '../config/api.js';
 
 /**
  * @param {string} anime
@@ -76,4 +77,48 @@ export async function fetchMatchApi(payload, prefix) {
         console.warn(`[自动匹配] match 失败:`, error.message || error);
         return null;
     }
+}
+
+/**
+ * 获取指定 episodeId 的弹幕
+ * @param {string|number} episodeId
+ * @returns {Promise<object[]|null>}
+ */
+export async function fetchComment(episodeId) {
+    const prefix = window.ede?.episode_info?.apiPrefix || dandanplayApi.prefix;
+    const url = `${prefix}/comment/${episodeId}?withRelated=true&chConvert=${window.ede?.chConvert ?? 1}`;
+    return fetchJson(url)
+        .then((data) => {
+            console.log('[获取]弹幕成功: ' + data.comments.length);
+            return data.comments;
+        })
+        .catch((error) => {
+            console.log('[获取]弹幕失败:', error);
+            return null;
+        });
+}
+
+/**
+ * 获取第三方 URL 的弹幕
+ * @param {string} extUrl
+ * @param {object[]} [comments] - 已有弹幕，用于差集
+ * @returns {Promise<object[]|null>}
+ */
+export async function fetchExtcommentActual(extUrl, comments) {
+    if (!extUrl) return null;
+    let extComments = (await fetchJson(dandanplayApi.getExtcomment(extUrl)))?.comments || [];
+    if (extComments.length === 0) {
+        extComments = (await fetchJson(dandanplayApi.getExtcomment(extUrl)))?.comments || [];
+    }
+    extComments.forEach((c) => (c.fromUrl = extUrl));
+    const itemId = window.ede?.itemId;
+    if (itemId) {
+        if (!window.ede.extCommentCache) window.ede.extCommentCache = {};
+        if (!window.ede.extCommentCache[itemId]) window.ede.extCommentCache[itemId] = {};
+        if (comments?.length) {
+            extComments = extComments.filter((extC) => !comments.some((c) => c.cid === extC.cid));
+        }
+        window.ede.extCommentCache[itemId][extUrl] = extComments;
+    }
+    return extComments;
 }
