@@ -11,6 +11,26 @@ import { tryMatchByHash } from './hash.js';
 import { autoFailback } from './fallback.js';
 
 /**
+ * 写入赛季信息到 localStorage
+ * @param {string} _season_key
+ * @param {object} newSeasonInfo
+ */
+export function writeLsSeasonInfo(_season_key, newSeasonInfo) {
+    if (!_season_key) {
+        return console.log('_season_key is undefined, skip');
+    }
+    let seasonInfoListStr = localStorage.getItem(_season_key);
+    let seasonInfoList = seasonInfoListStr ? JSON.parse(seasonInfoListStr) : [];
+    const existingSeasonInfo = seasonInfoList.find((si) => si.name === newSeasonInfo.name);
+    if (!existingSeasonInfo) {
+        seasonInfoList.push(newSeasonInfo);
+    } else {
+        Object.assign(existingSeasonInfo, newSeasonInfo);
+    }
+    localStorage.setItem(_season_key, JSON.stringify(seasonInfoList));
+}
+
+/**
  * 解析 "XXXX SXXEXX" 格式的标题
  * @param {string} animeName
  * @returns {{ title: string, season: number|null, episode: number|null }}

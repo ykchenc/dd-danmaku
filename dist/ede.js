@@ -711,6 +711,43 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
     return typeof keyOrFunc === 'function' ? keyOrFunc(option, index) : option[keyOrFunc];
   }
 
+  /**
+   * 获取当前设置 JSON 字符串
+   * @param {object} lsKeys - 配置键对象
+   * @param {function} lsGetItem - 获取存储项函数
+   * @param {number} [space=4] - 缩进空格数
+   * @returns {string}
+   */
+  function getSettingsJson(lsKeys, lsGetItem) {
+    var space = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 4;
+    return JSON.stringify(Object.fromEntries(objectEntries(lsKeys).map(function (_ref) {
+      var _ref2 = _slicedToArray(_ref, 2);
+        _ref2[0];
+        var value = _ref2[1];
+      return [value.id, lsGetItem(value.id)];
+    })), null, space);
+  }
+
+  /**
+   * 重置设置为默认值
+   * @param {object} lsKeys - 配置键对象
+   * @param {function} lsBatchSet - 批量设置函数
+   */
+  function settingsReset(lsKeys, lsBatchSet) {
+    var defaultSettings = Object.fromEntries(objectEntries(lsKeys).filter(function (_ref3) {
+      var _ref4 = _slicedToArray(_ref3, 2);
+        _ref4[0];
+        var value = _ref4[1];
+      return lsKeys.filterKeywords.id !== value.id;
+    }).map(function (_ref5) {
+      var _ref6 = _slicedToArray(_ref5, 2);
+        _ref6[0];
+        var value = _ref6[1];
+      return [value.id, value.defaultValue];
+    }));
+    lsBatchSet(defaultSettings);
+  }
+
   function refreshEventListener(eventsMap) {
     objectEntries(eventsMap).forEach(function (_ref) {
       var _ref2 = _slicedToArray(_ref, 2),
@@ -809,6 +846,15 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
       return null;
     }
     return parentNode.querySelector(".".concat(className));
+  }
+
+  /**
+   * 仅适用于 input 元素和下一个临近元素的事件
+   * @param {Event} e
+   * @returns {HTMLInputElement}
+   */
+  function getTargetInput(e) {
+    return e.target.tagName === 'INPUT' ? e.target : e.target.previousElementSibling;
   }
 
   /**
@@ -987,6 +1033,40 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
   }
 
   /**
+   * 创建链接元素
+   * @param {string} href - 链接地址
+   * @param {string} [text] - 显示文本
+   * @returns {HTMLAnchorElement}
+   */
+  function embyALink(href, text) {
+    var aEle = document.createElement('a');
+    aEle.setAttribute('is', 'emby-linkbutton');
+    aEle.href = href;
+    aEle.textContent = text || href;
+    aEle.target = '_blank';
+    aEle.className = 'button-link button-link-color-inherit button-link-fontweight-inherit emby-button';
+    if (OS && OS.isMobile && OS.isMobile()) {
+      aEle.addEventListener('click', function (event) {
+        event.preventDefault();
+        navigator.clipboard.writeText(href).then(function () {
+          console.log('Link copied to clipboard:', href);
+          var label = document.createElement('label');
+          label.textContent = '已复制';
+          label.style.color = 'green';
+          label.style.paddingLeft = '0.5em';
+          aEle.append(label);
+          setTimeout(function () {
+            aEle.removeChild(label);
+          }, 3000);
+        }, function (err) {
+          console.error('Failed to copy link:', err);
+        });
+      });
+    }
+    return aEle;
+  }
+
+  /**
    * DOM 元素 ID 集合
    * 从 ede.js 迁移，未修改原有实现逻辑
    */
@@ -1114,6 +1194,55 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
       stringValue = String(value);
     }
     localStorage.setItem(id, stringValue);
+  }
+  function lsCheckOld(id, value) {
+    return JSON.stringify(lsGetItem(id)) === JSON.stringify(value);
+  }
+  function lsCheckSet(id, value) {
+    if (lsCheckOld(id, value)) {
+      return false;
+    }
+    lsSetItem(id, value);
+    return true;
+  }
+
+  /**
+   * 批量设置缓存
+   * @param {object} keyValues - 键值对对象，如 { key1: value1, key2: value2 }
+   * @param {boolean} [needCheck=true] - 是否检查后设置
+   * @returns {boolean|undefined} - needCheck 为 true 时返回是否有更新
+   */
+  function lsBatchSet(keyValues) {
+    var needCheck = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : true;
+    if (needCheck) {
+      return objectEntries(keyValues).reduce(function (acc, _ref) {
+        var _ref2 = _slicedToArray(_ref, 2),
+          id = _ref2[0],
+          value = _ref2[1];
+        return acc || lsCheckSet(id, value);
+      }, false);
+    }
+    objectEntries(keyValues).forEach(function (_ref3) {
+      var _ref4 = _slicedToArray(_ref3, 2),
+        id = _ref4[0],
+        value = _ref4[1];
+      return lsSetItem(id, value);
+    });
+  }
+
+  /**
+   * 按前缀批量移除 localStorage
+   * @param {string[]} prefixes - 键前缀数组
+   * @returns {boolean} - 是否有移除
+   */
+  function lsBatchRemove(prefixes) {
+    return Object.keys(localStorage).filter(function (key) {
+      return prefixes.some(function (prefix) {
+        return key.startsWith(prefix);
+      });
+    }).map(function (key) {
+      return localStorage.removeItem(key);
+    }).length > 0;
   }
 
   /**
@@ -1294,6 +1423,53 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
     check: 'check',
     edit: 'edit'
   };
+  var embyOffsetBtnStyle = 'margin: 0;padding: 0;';
+  var timeOffsetBtns = [{
+    label: '-30',
+    valueOffset: '-30',
+    iconKey: iconKeys.replay_30,
+    style: embyOffsetBtnStyle
+  }, {
+    label: '-10',
+    valueOffset: '-10',
+    iconKey: iconKeys.replay_10,
+    style: embyOffsetBtnStyle
+  }, {
+    label: '-5',
+    valueOffset: '-5',
+    iconKey: iconKeys.replay_5,
+    style: embyOffsetBtnStyle
+  }, {
+    label: '-1',
+    valueOffset: '-1',
+    iconKey: iconKeys.replay,
+    style: embyOffsetBtnStyle
+  }, {
+    label: '0',
+    valueOffset: '0',
+    iconKey: iconKeys.reset,
+    style: embyOffsetBtnStyle
+  }, {
+    label: '+1',
+    valueOffset: '1',
+    iconKey: iconKeys.replay,
+    style: embyOffsetBtnStyle + ' transform: rotateY(180deg);'
+  }, {
+    label: '+5',
+    valueOffset: '5',
+    iconKey: iconKeys.forward_5,
+    style: embyOffsetBtnStyle
+  }, {
+    label: '+10',
+    valueOffset: '10',
+    iconKey: iconKeys.forward_10,
+    style: embyOffsetBtnStyle
+  }, {
+    label: '+30',
+    valueOffset: '30',
+    iconKey: iconKeys.forward_30,
+    style: embyOffsetBtnStyle
+  }];
 
   // emby ui class
   var classes = {
@@ -1454,6 +1630,102 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
   }
 
   /**
+   * 创建 Emby 风格文本域
+   * @param {object} props - { id, value, rows, style, styleResize, readonly, ... }
+   * @param {function} [onBlur] - 失焦回调
+   * @returns {HTMLTextAreaElement}
+   */
+  function embyTextarea(props, onBlur) {
+    var defaultProps = {
+      rows: 10,
+      styleResize: 'vertical',
+      readonly: false
+    };
+    props = _objectSpread2(_objectSpread2({}, defaultProps), props);
+    var textarea = document.createElement('textarea', {
+      is: 'emby-textarea'
+    });
+    objectEntries(props).forEach(function (_ref3) {
+      var _ref4 = _slicedToArray(_ref3, 2),
+        key = _ref4[0],
+        value = _ref4[1];
+      if (typeof value !== 'function' && key !== 'readonly' && key !== 'styleResize' && key !== 'value') {
+        textarea.setAttribute(key, value);
+      }
+    });
+    textarea.className = 'txtOverview emby-textarea';
+    textarea.readOnly = props.readonly;
+    textarea.style.resize = props.styleResize;
+    textarea.value = props.value;
+    if (typeof onBlur === 'function') {
+      textarea.addEventListener('blur', onBlur);
+    }
+    return textarea;
+  }
+
+  /**
+   * 创建 Emby 风格下拉选择
+   * @param {object} props - 属性
+   * @param {number|string} selectedIndexOrValue - 选中索引或值
+   * @param {Array} options - 选项数组
+   * @param {string|function} optionValueKey - 值键名或取值函数
+   * @param {string|function} optionTitleKey - 标题键名或取值函数
+   * @param {function} [onChange] - 变更回调
+   * @param {function} [onFocus] - 聚焦回调
+   * @returns {HTMLLabelElement}
+   */
+  function embySelect(props, selectedIndexOrValue, options, optionValueKey, optionTitleKey, onChange, onFocus) {
+    var defaultProps = {
+      class: 'emby-select'
+    };
+    props = _objectSpread2(_objectSpread2({}, defaultProps), props);
+    if (!Number.isInteger(selectedIndexOrValue)) {
+      selectedIndexOrValue = options.indexOf(selectedIndexOrValue);
+    }
+    var selectElement = document.createElement('select', {
+      is: 'emby-select'
+    });
+    if (typeof require === 'function') {
+      require(['browser'], function (browser) {
+        if (browser.tv) {
+          selectElement.classList.add(classes.embySelectTv);
+        }
+      });
+    }
+    objectEntries(props).forEach(function (_ref5) {
+      var _ref6 = _slicedToArray(_ref5, 2),
+        key = _ref6[0],
+        value = _ref6[1];
+      if (typeof value !== 'function') {
+        selectElement.setAttribute(key, value);
+      }
+    });
+    options.forEach(function (option, index) {
+      var value = getValueOrInvoke(option, optionValueKey, index);
+      var title = getValueOrInvoke(option, optionTitleKey, index);
+      var optionElement = document.createElement('option');
+      optionElement.value = value;
+      optionElement.textContent = title;
+      if (index === selectedIndexOrValue) {
+        optionElement.selected = true;
+      }
+      selectElement.append(optionElement);
+    });
+    if (typeof onChange === 'function') {
+      selectElement.addEventListener('change', function (e) {
+        onChange(e.target.value, e.target.selectedIndex, options[e.target.selectedIndex]);
+      });
+    }
+    if (typeof onFocus === 'function') {
+      selectElement.addEventListener('focus', onFocus);
+    }
+    var selectLabel = document.createElement('label');
+    selectLabel.classList.add('selectLabel');
+    selectLabel.appendChild(selectElement);
+    return selectLabel;
+  }
+
+  /**
    * 创建 Emby 风格 Tab 切换
    * @param {Array} options - 选项数组
    * @param {string|number} selectedValue - 选中值
@@ -1490,6 +1762,71 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
       });
     }
     return tabs;
+  }
+
+  /**
+   * 创建单个复选框
+   * @param {object} opts - { id, name, label, value }
+   * @param {boolean} [checked=false]
+   * @param {function} [onChange]
+   * @returns {HTMLLabelElement}
+   */
+  function embyCheckbox(_ref) {
+    var id = _ref.id,
+      name = _ref.name,
+      label = _ref.label,
+      value = _ref.value;
+    var checked = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+    var onChange = arguments.length > 2 ? arguments[2] : undefined;
+    var checkboxLabel = document.createElement('label');
+    checkboxLabel.classList.add('emby-checkbox-label');
+    checkboxLabel.setAttribute('style', 'width: auto;');
+    var checkbox = document.createElement('input', {
+      is: 'emby-checkbox'
+    });
+    checkbox.setAttribute('type', 'checkbox');
+    checkbox.setAttribute('id', id);
+    checkbox.setAttribute('name', name);
+    checkbox.setAttribute('value', value);
+    checkbox.checked = checked;
+    checkbox.classList.add('emby-checkbox', 'chkEnableLiveTvAccess');
+    if (typeof onChange === 'function') {
+      checkbox.addEventListener('change', function (e) {
+        return onChange(e.target.checked);
+      });
+    }
+    var span = document.createElement('span');
+    span.setAttribute('class', 'checkboxLabel');
+    span.innerHTML = label;
+    checkboxLabel.append(checkbox);
+    checkboxLabel.append(span);
+    return checkboxLabel;
+  }
+
+  /**
+   * 创建复选框列表
+   * @param {string} id - 容器 ID
+   * @param {string} checkBoxName - 复选框 name
+   * @param {string[]} [selectedStrArray] - 已选值数组
+   * @param {Array} options - 选项数组 { id, name }
+   * @param {function} [onChange]
+   * @param {boolean} [isVertical=false]
+   * @returns {HTMLElement}
+   */
+  function embyCheckboxList(id, checkBoxName, selectedStrArray, options, onChange) {
+    var isVertical = arguments.length > 5 && arguments[5] !== undefined ? arguments[5] : false;
+    var checkboxContainer = document.createElement('div');
+    checkboxContainer.setAttribute('class', classes.embyCheckboxList);
+    checkboxContainer.setAttribute('style', isVertical ? '' : styles.embyCheckboxList);
+    checkboxContainer.setAttribute('id', id);
+    options.forEach(function (option) {
+      checkboxContainer.append(embyCheckbox({
+        name: checkBoxName,
+        label: option.name,
+        value: option.id
+      }, selectedStrArray ? selectedStrArray.indexOf(option.id) > -1 : false, onChange));
+    });
+    return checkboxContainer;
   }
 
   /**
@@ -1673,6 +2010,23 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
       name: '弹幕CID'
     } // 非弹幕 id,唯一性需自行用 uid + cid 拼接的 cuid
   };
+  var danmakuEngineOpts = [{
+    id: 'canvas',
+    name: 'canvas'
+  }, {
+    id: 'dom',
+    name: 'dom'
+  }];
+  var danmakuChConverOpts = [{
+    id: '0',
+    name: '未启用'
+  }, {
+    id: '1',
+    name: '转换为简体'
+  }, {
+    id: '2',
+    name: '转换为繁体'
+  }];
   var toastPrefixes = {
     system: '[系统通知] : '
   };
@@ -1738,332 +2092,102 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
       }) : [];
     }
   }];
-
-  /**
-   * 弹幕设置 Tab
-   * 从 ede.js 迁移，占位实现，待阶段 5 事件整合后补全
-   */
-
-  /**
-   * 构建弹幕设置 Tab
-   * @param {string} containerId
-   */
-  function buildDanmakuSetting(containerId) {
-    var container = getById(containerId);
-    if (!container) return;
-    var template = "\n        <div style=\"display: flex; justify-content: center;\">\n            <div>\n                <div id=\"".concat(eleIds.danmakuSwitchDiv, "\" style=\"margin-bottom: 0.2em;\">\n                    <label class=\"").concat(classes.embyLabel, "\">").concat(lsKeys.switch.name, " </label>\n                </div>\n                <div style=\"").concat(styles.embySlider, "\">\n                    <label class=\"").concat(classes.embyLabel, "\" style=\"width: 5em;\">").concat(lsKeys.filterLevel.name, ": </label>\n                    <div id=\"").concat(eleIds.filterLevelDiv, "\" style=\"width: 15.5em; text-align: center;\"></div>\n                    <label style=\"").concat(styles.embySliderLabel, "\"></label>\n                </div>\n                <div id=\"").concat(eleIds.settingsCtrl, "\" style=\"margin: 0.6em 0;\"></div>\n            </div>\n        </div>\n    ");
-    container.innerHTML = template.trim();
-    getById(eleIds.danmakuSwitchDiv, container).prepend(embyButton({
-      id: eleIds.danmakuSwitch,
-      label: '弹幕开关',
-      iconKey: lsGetItem(lsKeys.switch.id) ? iconKeys.switch_on : iconKeys.switch_off,
-      style: (lsGetItem(lsKeys.switch.id) ? 'color:#52b54b;' : '') + 'font-size:1.5em;padding:0;'
-    }, function () {
-      var _window$ede;
-      var flag = !lsGetItem(lsKeys.switch.id);
-      lsSetItem(lsKeys.switch.id, flag);
-      if ((_window$ede = window.ede) !== null && _window$ede !== void 0 && _window$ede.danmaku) {
-        flag ? window.ede.danmaku.show() : window.ede.danmaku.hide();
-      }
-    }));
-    getById(eleIds.filterLevelDiv, container).append(embySlider({
-      lsKey: lsKeys.filterLevel
-    }, function (val, opts) {
-      if (opts.labelEle) opts.labelEle.innerText = val;
-      lsSetItem(lsKeys.filterLevel.id, parseFloat(val));
-    }));
-  }
-
-  /**
-   * 手动匹配 Tab
-   * 从 ede.js 迁移，占位实现，待阶段 5 事件整合后补全
-   */
-
-  /**
-   * 构建手动匹配 Tab
-   * @param {string} containerId
-   */
-  function buildSearchEpisode(containerId) {
-    var _window$ede;
-    var container = getById(containerId);
-    if (!container) return;
-    var template = "\n        <div>\n            <div>\n                <label class=\"".concat(classes.embyLabel, "\">\u6807\u9898: </label>\n                <div id=\"").concat(eleIds.danmakuSearchNameDiv, "\" style=\"display: flex;\"></div>\n            </div>\n        </div>\n    ");
-    container.innerHTML = template.trim();
-    var searchNameDiv = getById(eleIds.danmakuSearchNameDiv, container);
-    searchNameDiv.append(embyInput({
-      id: eleIds.danmakuSearchName,
-      value: ((_window$ede = window.ede) === null || _window$ede === void 0 || (_window$ede = _window$ede.searchDanmakuOpts) === null || _window$ede === void 0 ? void 0 : _window$ede.animeName) || '',
-      type: 'search'
-    }));
-    searchNameDiv.append(embyButton({
-      label: '搜索',
-      iconKey: iconKeys.search
-    }, function () {}));
-  }
-
-  /**
-   * 网络请求工具
-   * 从 ede.js 迁移，未修改原有实现逻辑
-   */
-
-  /**
-   * 封装 fetch，支持 JSON 请求
-   * @param {string} url
-   * @param {object} [opts] - { token, headers, body, method }
-   * @returns {Promise<object>}
-   */
-  async function fetchJson(url) {
-    var opts = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-    var token = opts.token,
-      headers = opts.headers,
-      body = opts.body;
-    var _opts$method = opts.method,
-      method = _opts$method === void 0 ? 'GET' : _opts$method;
-    if (method === 'GET' && body) {
-      method = 'POST';
-    }
-    var requestHeaders = {
-      'Accept-Encoding': 'gzip',
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      'User-Agent': navigator.userAgent
-    };
-    if (token) {
-      requestHeaders.Authorization = "Bearer ".concat(token);
-    }
-    if (headers) {
-      Object.assign(requestHeaders, headers);
-    }
-    var requestBody = body ? JSON.stringify(body) : null;
-    var response = await fetch(url, {
-      method: method,
-      headers: requestHeaders,
-      body: requestBody
-    });
-    if (!response.ok) {
-      throw new Error("HTTP error! Status: ".concat(response.status));
-    }
-    var responseText = await response.text();
-    if (responseText.length > 0) {
-      try {
-        return JSON.parse(responseText);
-      } catch (parseError) {
-        console.warn('responseText not is JSON:', parseError);
-      }
-    }
-    return {
-      success: true
-    };
-  }
-
-  /**
-   * localStorage 前缀键配置
-   * 从 ede.js 迁移，未修改原有实现逻辑
-   */
-
-  var lsLocalKeys = {
-    animePrefix: '_anime_id_rel_',
-    animeSeasonPrefix: '_anime_season_rel_',
-    animeEpisodePrefix: '_episode_id_rel_',
-    bangumiEpInfoPrefix: '_bangumi_episode_id_rel_',
-    bangumiMe: '_bangumi_me',
-    apiPrefix: '_api_'
+  var timeoutCallbackUnitOpts = [{
+    id: '0',
+    name: '秒',
+    msRate: 1000
+  }, {
+    id: '1',
+    name: '分',
+    msRate: 1000 * 60
+  }, {
+    id: '2',
+    name: '时',
+    msRate: 1000 * 60 * 60
+  }];
+  var apiPriorityOpts = [{
+    id: 'official',
+    name: '官方API优先'
+  }, {
+    id: 'custom',
+    name: '自定义API优先'
+  }];
+  var labels = {
+    enable: '启用'
   };
 
   /**
-   * Bangumi API 相关
-   * 从 ede.js 迁移，未修改原有实现逻辑
+   * 解析弹幕数据为引擎格式
+   * @param {object[]} $obj - 原始弹幕数组 { p, m, cid }
+   * @returns {object[]}
    */
-
-  /**
-   * 修正 Bangumi 集数索引（番剧非第一季时）
-   * @param {number} currentBgmEpisodeIndex
-   * @param {object} danDanPlayBangumi
-   * @returns {number}
-   */
-  function offsetBgmEpisodeIndex(currentBgmEpisodeIndex, danDanPlayBangumi) {
-    if (!danDanPlayBangumi) {
-      return currentBgmEpisodeIndex;
-    }
-    var bangumiEp = danDanPlayBangumi.episodes[currentBgmEpisodeIndex];
-    if (!bangumiEp) {
-      console.log("\u672A\u5339\u914D\u5230 danDanPlayBangumi \u756A\u5267\u96C6\u6570,\u5267\u96C6\u4E0D\u4E3A\u7B2C\u4E00\u5B63,\u5C1D\u8BD5\u5207\u6362\u63A5\u53E3\u6570\u636E\u5339\u914D\u8FD4\u56DE\u4FEE\u6B63\u540E\u7684 bgmEpisodeIndex");
-      return danDanPlayBangumi.episodes.findIndex(function (ep) {
-        return ep.episodeNumber == currentBgmEpisodeIndex + 1;
-      });
+  function danmakuParser($obj) {
+    var _styles$fontStyles$ls;
+    var fontSizeRate = lsGetItem(lsKeys.fontSizeRate.id);
+    var fontSize = 25;
+    var fontSizeReferent = getByClass(classes.videoOsdTitle);
+    if (fontSizeReferent) {
+      fontSize = parseFloat(getComputedStyle(fontSizeReferent).fontSize.replace('px', '')) * fontSizeRate;
     } else {
-      return currentBgmEpisodeIndex;
+      fontSize = Math.round((window.screen.height > window.screen.width ? window.screen.width : window.screen.height) / 1080 * 18 * fontSizeRate);
     }
+    var fontWeight = lsGetItem(lsKeys.fontWeight.id);
+    var fontStyle = ((_styles$fontStyles$ls = styles.fontStyles[lsGetItem(lsKeys.fontStyle.id)]) === null || _styles$fontStyles$ls === void 0 ? void 0 : _styles$fontStyles$ls.id) || 'normal';
+    var fontFamily = lsGetItem(lsKeys.fontFamily.id);
+    var fontOpacity = Math.round(lsGetItem(lsKeys.fontOpacity.id) * 255).toString(16).padStart(2, '0');
+    var timelineOffset = lsGetItem(lsKeys.timelineOffset.id);
+    var sourceUidReg = /\[(.*)\](.*)/;
+    var showSourceIds = lsGetItem(lsKeys.showSource.id) || [];
+    return $obj.map(function ($comment) {
+      var _values$, _danmakuSource$DanDan;
+      var p = $comment.p;
+      var values = p.split(',');
+      var mode = {
+        6: 'ltr',
+        1: 'rtl',
+        5: 'top',
+        4: 'bottom'
+      }[values[1]];
+      if (!mode) return null;
+      var baseColor = Number(values[2]).toString(16).padStart(6, '0');
+      var color = "".concat(baseColor).concat(fontOpacity);
+      var shadowColor = baseColor === '000000' ? "#ffffff".concat(fontOpacity) : "#000000".concat(fontOpacity);
+      var sourceUidMatches = (_values$ = values[3]) === null || _values$ === void 0 ? void 0 : _values$.match(sourceUidReg);
+      var sourceId = sourceUidMatches !== null && sourceUidMatches !== void 0 && sourceUidMatches[1] ? sourceUidMatches[1] : ((_danmakuSource$DanDan = danmakuSource.DanDanPlay) === null || _danmakuSource$DanDan === void 0 ? void 0 : _danmakuSource$DanDan.id) || 'DanDanPlay';
+      var originalUserId = sourceUidMatches !== null && sourceUidMatches !== void 0 && sourceUidMatches[2] ? sourceUidMatches[2] : values[3];
+      var cmt = _defineProperty(_defineProperty(_defineProperty({
+        text: $comment.m,
+        mode: mode,
+        time: values[0] * 1 + timelineOffset,
+        style: getCommentStyle(color, shadowColor, fontStyle, fontWeight, fontSize, fontFamily)
+      }, showSource.cid.id, $comment.cid), showSource.source.id, sourceId), showSource.originalUserId.id, originalUserId);
+      if (showSourceIds.length > 0) {
+        cmt.originalText = cmt.text;
+        cmt.text += showSourceIds.map(function (id) {
+          return id === showSource.source.id ? ",[".concat(cmt[id], "]") : ',' + cmt[id];
+        }).join('');
+      }
+      cmt.cuid = cmt[showSource.cid.id] + ',' + cmt[showSource.originalUserId.id];
+      return cmt;
+    }).filter(function (x) {
+      return x;
+    }).sort(function (a, b) {
+      return a.time - b.time;
+    });
   }
 
   /**
-   * 获取当前集对应的 Bangumi 关联信息
-   * @returns {Promise<object>}
+   * 获取弹幕样式对象
    */
-  async function getEpisodeBangumiRel() {
-    var episode_info = window.ede.episode_info;
-    var _bangumi_key = lsLocalKeys.bangumiEpInfoPrefix + episode_info.episodeId;
-    var bangumiInfoLs = localStorage.getItem(_bangumi_key);
-    if (bangumiInfoLs) {
-      bangumiInfoLs = JSON.parse(bangumiInfoLs);
-    }
-    var bangumiEpsRes = bangumiInfoLs ? bangumiInfoLs.bangumiEpsRes : null;
-    var subjectId = bangumiInfoLs ? bangumiInfoLs.subjectId : null;
-    var bangumiUrl = bangumiInfoLs ? bangumiInfoLs.bangumiUrl : null;
-    var animeId = episode_info.animeId;
-    if (!subjectId) {
-      if (!animeId) {
-        throw new Error('未获取到 animeId');
-      }
-      var danDanPlayBangumiRes = await fetchJson(dandanplayApi.getBangumi(animeId));
-      episode_info.bgmEpisodeIndex = offsetBgmEpisodeIndex(episode_info.bgmEpisodeIndex, danDanPlayBangumiRes.bangumi);
-      bangumiUrl = danDanPlayBangumiRes.bangumi.bangumiUrl;
-      if (!bangumiUrl) {
-        throw new Error('未请求到 bangumiUrl');
-      }
-      subjectId = parseInt(bangumiUrl.match(/\/(\d+)$/)[1]);
-    }
-    var episodeIndex = episode_info ? episode_info.episodeIndex : null;
-    var bgmEpisodeIndex = episode_info ? episode_info.bgmEpisodeIndex : null;
-    var bangumiInfo = {
-      animeId: animeId,
-      bangumiUrl: bangumiUrl,
-      subjectId: subjectId,
-      episodeIndex: episodeIndex,
-      bgmEpisodeIndex: bgmEpisodeIndex,
-      bangumiEpsRes: bangumiEpsRes,
-      _bangumi_key: _bangumi_key
+  function getCommentStyle(color, shadowColor, fontStyle, fontWeight, fontSize, fontFamily) {
+    return {
+      color: "#".concat(color),
+      textShadow: "-1px -1px ".concat(shadowColor, ", -1px 1px ").concat(shadowColor, ", 1px -1px ").concat(shadowColor, ", 1px 1px ").concat(shadowColor),
+      font: "".concat(fontStyle, " ").concat(fontWeight, " ").concat(fontSize, "px ").concat(fontFamily),
+      fillStyle: "#".concat(color),
+      strokeStyle: shadowColor,
+      lineWidth: 2.0
     };
-    window.ede.bangumiInfo = bangumiInfo;
-    localStorage.setItem(bangumiInfo._bangumi_key, JSON.stringify(bangumiInfo));
-    return bangumiInfo;
-  }
-
-  /**
-   * 提交 Bangumi 章节收藏状态为「看过」
-   * @param {string} token - Bangumi 个人令牌
-   * @returns {Promise<object>}
-   */
-  async function putBangumiEpStatus(token) {
-    var bangumiInfo = await getEpisodeBangumiRel();
-    var subjectId = bangumiInfo.subjectId,
-      bgmEpisodeIndex = bangumiInfo.bgmEpisodeIndex;
-    var episodeIndex = bgmEpisodeIndex ? bgmEpisodeIndex : bangumiInfo.episodeIndex;
-    console.log('准备校验 Bangumi 条目收藏状态是否为看过');
-    var bangumiMe = localStorage.getItem(lsLocalKeys.bangumiMe);
-    if (bangumiMe) {
-      bangumiMe = JSON.parse(bangumiMe);
-    } else {
-      bangumiMe = await fetchBangumiApiGetMe(token);
-    }
-    var msg = '';
-    var bangumiUserColl = null;
-    try {
-      bangumiUserColl = await fetchJson(bangumiApi.getUserCollection(bangumiMe.username, subjectId), {
-        token: token
-      });
-    } catch (error) {
-      console.warn('Bangumi 条目未收藏');
-    }
-    if (bangumiUserColl && bangumiUserColl.type === 2) {
-      msg = 'Bangumi 条目已为看过状态,跳过更新';
-      console.log(msg, bangumiUserColl);
-      throw new Error(msg);
-    }
-    console.log('准备修改 Bangumi 条目收藏状态为在看, 如果不存在则创建, 如果存在则修改');
-    var body = {
-      type: 3
-    };
-    await fetchJson(bangumiApi.postUserCollection(subjectId), {
-      token: token,
-      body: body
-    });
-    if (!bangumiInfo.bangumiEpsRes) {
-      var fetchUrl = bangumiApi.getUserSubjectEpisodeCollection(subjectId);
-      var bangumiEpsRes = await fetchJson(fetchUrl, {
-        token: token
-      });
-      bangumiInfo.bangumiEpsRes = bangumiEpsRes;
-      var _bangumiEpColl = bangumiEpsRes.data[episodeIndex];
-      if (!_bangumiEpColl) {
-        throw new Error('未匹配到 bangumiEpColl');
-      }
-    }
-    var bangumiEpColl = bangumiInfo.bangumiEpsRes.data[episodeIndex];
-    var bangumiEp = bangumiEpColl.episode;
-    if (bangumiEpColl.type === 2) {
-      msg = 'Bangumi 章节收藏已是看过状态,跳过更新';
-      console.log(msg, bangumiEp);
-      throw new Error(msg);
-    }
-    console.log('准备更新 Bangumi 章节收藏状态, 详情: ', bangumiEp);
-    body.type = 2;
-    await fetchJson(bangumiApi.putUserEpisodeCollection(bangumiEp.id), {
-      token: token,
-      body: body,
-      method: 'PUT'
-    });
-    bangumiEp.type = body.type;
-    console.log("\u6210\u529F\u66F4\u65B0 Bangumi \u7AE0\u8282\u6536\u85CF\u72B6\u6001, \u5728\u770B => \u770B\u8FC7, \u8BE6\u60C5: ", bangumiEp);
-    window.ede.bangumiInfo = bangumiInfo;
-    localStorage.setItem(bangumiInfo._bangumi_key, JSON.stringify(bangumiInfo));
-    return bangumiInfo;
-  }
-
-  /**
-   * 验证 Bangumi Token 并获取用户信息
-   * @param {string} bangumiToken
-   * @returns {Promise<object>}
-   */
-  async function fetchBangumiApiGetMe(bangumiToken) {
-    try {
-      var res = await fetchJson(bangumiApi.getMe(), {
-        token: bangumiToken
-      });
-      console.log('Bangumi Token 验证成功', res);
-      localStorage.setItem(lsLocalKeys.bangumiMe, JSON.stringify(res));
-      return res;
-    } catch (error) {
-      console.error('Bangumi Token 验证失败', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Bangumi 角色展示
-   * 从 ede.js buildExtInfo 中拆出，未修改原有实现逻辑
-   */
-
-  /**
-   * 渲染 Bangumi 角色与声优信息
-   * @param {HTMLElement} container - 容器元素
-   * @param {Array} characters - 角色数据数组
-   */
-  function renderBangumiCharacters(container, characters) {
-    characters.map(function (c) {
-      var characterDiv = document.createElement('div');
-      characterDiv.style = 'width: 31%; display: flex; margin: .5em;';
-      var embyImgButtonInner = embyImg(c.images.large, 'object-position: top;');
-      if (!c.images.large) {
-        embyImgButtonInner = embyI(iconKeys.person, classes.cardImageIcon);
-      }
-      characterDiv.append(embyImgButton(embyImgButtonInner));
-      var characterRightDiv = document.createElement('div');
-      characterRightDiv.style.marginLeft = '.5em';
-      var characterNameDiv = document.createElement('div');
-      characterNameDiv.textContent = c.relation + ': ' + c.name;
-      characterRightDiv.append(characterNameDiv);
-      var characterCvDiv = document.createElement('div');
-      characterCvDiv.textContent = 'CV: ' + c.actors.map(function (a) {
-        return a.name;
-      }).join();
-      if (c.actors[0]) {
-        characterCvDiv.append(embyImgButton(embyImg(c.actors[0].images.large)));
-      }
-      characterRightDiv.append(characterCvDiv);
-      characterDiv.append(characterRightDiv);
-      container.append(characterDiv);
-    });
   }
 
   /**
@@ -2446,80 +2570,6 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
   }
 
   /**
-   * 解析弹幕数据为引擎格式
-   * @param {object[]} $obj - 原始弹幕数组 { p, m, cid }
-   * @returns {object[]}
-   */
-  function danmakuParser($obj) {
-    var _styles$fontStyles$ls;
-    var fontSizeRate = lsGetItem(lsKeys.fontSizeRate.id);
-    var fontSize = 25;
-    var fontSizeReferent = getByClass(classes.videoOsdTitle);
-    if (fontSizeReferent) {
-      fontSize = parseFloat(getComputedStyle(fontSizeReferent).fontSize.replace('px', '')) * fontSizeRate;
-    } else {
-      fontSize = Math.round((window.screen.height > window.screen.width ? window.screen.width : window.screen.height) / 1080 * 18 * fontSizeRate);
-    }
-    var fontWeight = lsGetItem(lsKeys.fontWeight.id);
-    var fontStyle = ((_styles$fontStyles$ls = styles.fontStyles[lsGetItem(lsKeys.fontStyle.id)]) === null || _styles$fontStyles$ls === void 0 ? void 0 : _styles$fontStyles$ls.id) || 'normal';
-    var fontFamily = lsGetItem(lsKeys.fontFamily.id);
-    var fontOpacity = Math.round(lsGetItem(lsKeys.fontOpacity.id) * 255).toString(16).padStart(2, '0');
-    var timelineOffset = lsGetItem(lsKeys.timelineOffset.id);
-    var sourceUidReg = /\[(.*)\](.*)/;
-    var showSourceIds = lsGetItem(lsKeys.showSource.id) || [];
-    return $obj.map(function ($comment) {
-      var _values$, _danmakuSource$DanDan;
-      var p = $comment.p;
-      var values = p.split(',');
-      var mode = {
-        6: 'ltr',
-        1: 'rtl',
-        5: 'top',
-        4: 'bottom'
-      }[values[1]];
-      if (!mode) return null;
-      var baseColor = Number(values[2]).toString(16).padStart(6, '0');
-      var color = "".concat(baseColor).concat(fontOpacity);
-      var shadowColor = baseColor === '000000' ? "#ffffff".concat(fontOpacity) : "#000000".concat(fontOpacity);
-      var sourceUidMatches = (_values$ = values[3]) === null || _values$ === void 0 ? void 0 : _values$.match(sourceUidReg);
-      var sourceId = sourceUidMatches !== null && sourceUidMatches !== void 0 && sourceUidMatches[1] ? sourceUidMatches[1] : ((_danmakuSource$DanDan = danmakuSource.DanDanPlay) === null || _danmakuSource$DanDan === void 0 ? void 0 : _danmakuSource$DanDan.id) || 'DanDanPlay';
-      var originalUserId = sourceUidMatches !== null && sourceUidMatches !== void 0 && sourceUidMatches[2] ? sourceUidMatches[2] : values[3];
-      var cmt = _defineProperty(_defineProperty(_defineProperty({
-        text: $comment.m,
-        mode: mode,
-        time: values[0] * 1 + timelineOffset,
-        style: getCommentStyle(color, shadowColor, fontStyle, fontWeight, fontSize, fontFamily)
-      }, showSource.cid.id, $comment.cid), showSource.source.id, sourceId), showSource.originalUserId.id, originalUserId);
-      if (showSourceIds.length > 0) {
-        cmt.originalText = cmt.text;
-        cmt.text += showSourceIds.map(function (id) {
-          return id === showSource.source.id ? ",[".concat(cmt[id], "]") : ',' + cmt[id];
-        }).join('');
-      }
-      cmt.cuid = cmt[showSource.cid.id] + ',' + cmt[showSource.originalUserId.id];
-      return cmt;
-    }).filter(function (x) {
-      return x;
-    }).sort(function (a, b) {
-      return a.time - b.time;
-    });
-  }
-
-  /**
-   * 获取弹幕样式对象
-   */
-  function getCommentStyle(color, shadowColor, fontStyle, fontWeight, fontSize, fontFamily) {
-    return {
-      color: "#".concat(color),
-      textShadow: "-1px -1px ".concat(shadowColor, ", -1px 1px ").concat(shadowColor, ", 1px -1px ").concat(shadowColor, ", 1px 1px ").concat(shadowColor),
-      font: "".concat(fontStyle, " ").concat(fontWeight, " ").concat(fontSize, "px ").concat(fontFamily),
-      fillStyle: "#".concat(color),
-      strokeStyle: shadowColor,
-      lineWidth: 2.0
-    };
-  }
-
-  /**
    * 在进度条上绘制弹幕密度折线图
    * @param {number} chartHeightNum
    */
@@ -2568,6 +2618,20 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
     ctx.lineWidth = 2;
     ctx.stroke();
   }
+
+  /**
+   * localStorage 前缀键配置
+   * 从 ede.js 迁移，未修改原有实现逻辑
+   */
+
+  var lsLocalKeys = {
+    animePrefix: '_anime_id_rel_',
+    animeSeasonPrefix: '_anime_season_rel_',
+    animeEpisodePrefix: '_episode_id_rel_',
+    bangumiEpInfoPrefix: '_bangumi_episode_id_rel_',
+    bangumiMe: '_bangumi_me',
+    apiPrefix: '_api_'
+  };
 
   async function getEmbyItemInfo() {
     if (typeof require === 'function') {
@@ -2687,6 +2751,61 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
       seriesName: seriesName,
       seasonNumber: seasonNumber,
       episodeNumber: episodeNumber
+    };
+  }
+
+  /**
+   * 网络请求工具
+   * 从 ede.js 迁移，未修改原有实现逻辑
+   */
+
+  /**
+   * 封装 fetch，支持 JSON 请求
+   * @param {string} url
+   * @param {object} [opts] - { token, headers, body, method }
+   * @returns {Promise<object>}
+   */
+  async function fetchJson(url) {
+    var opts = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+    var token = opts.token,
+      headers = opts.headers,
+      body = opts.body;
+    var _opts$method = opts.method,
+      method = _opts$method === void 0 ? 'GET' : _opts$method;
+    if (method === 'GET' && body) {
+      method = 'POST';
+    }
+    var requestHeaders = {
+      'Accept-Encoding': 'gzip',
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'User-Agent': navigator.userAgent
+    };
+    if (token) {
+      requestHeaders.Authorization = "Bearer ".concat(token);
+    }
+    if (headers) {
+      Object.assign(requestHeaders, headers);
+    }
+    var requestBody = body ? JSON.stringify(body) : null;
+    var response = await fetch(url, {
+      method: method,
+      headers: requestHeaders,
+      body: requestBody
+    });
+    if (!response.ok) {
+      throw new Error("HTTP error! Status: ".concat(response.status));
+    }
+    var responseText = await response.text();
+    if (responseText.length > 0) {
+      try {
+        return JSON.parse(responseText);
+      } catch (parseError) {
+        console.warn('responseText not is JSON:', parseError);
+      }
+    }
+    return {
+      success: true
     };
   }
 
@@ -3261,6 +3380,28 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
   }
 
   /**
+   * 写入赛季信息到 localStorage
+   * @param {string} _season_key
+   * @param {object} newSeasonInfo
+   */
+  function writeLsSeasonInfo(_season_key, newSeasonInfo) {
+    if (!_season_key) {
+      return console.log('_season_key is undefined, skip');
+    }
+    var seasonInfoListStr = localStorage.getItem(_season_key);
+    var seasonInfoList = seasonInfoListStr ? JSON.parse(seasonInfoListStr) : [];
+    var existingSeasonInfo = seasonInfoList.find(function (si) {
+      return si.name === newSeasonInfo.name;
+    });
+    if (!existingSeasonInfo) {
+      seasonInfoList.push(newSeasonInfo);
+    } else {
+      Object.assign(existingSeasonInfo, newSeasonInfo);
+    }
+    localStorage.setItem(_season_key, JSON.stringify(seasonInfoList));
+  }
+
+  /**
    * 解析 "XXXX SXXEXX" 格式的标题
    * @param {string} animeName
    * @returns {{ title: string, season: number|null, episode: number|null }}
@@ -3770,6 +3911,923 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
     });
   }
 
+  function doDanmakuSwitch$1() {
+    var _window$ede;
+    var flag = !lsGetItem(lsKeys.switch.id);
+    console.log("\u5207\u6362".concat(lsKeys.switch.name, ": ").concat(flag));
+    if ((_window$ede = window.ede) !== null && _window$ede !== void 0 && _window$ede.danmaku) {
+      flag ? window.ede.danmaku.show() : window.ede.danmaku.hide();
+    }
+    var osdDanmakuSwitchBtn = getById(eleIds.danmakuSwitchBtn);
+    if (osdDanmakuSwitchBtn) {
+      osdDanmakuSwitchBtn.firstChild.innerHTML = flag ? iconKeys.comment : iconKeys.comments_disabled;
+    }
+    var switchElement = getById(eleIds.danmakuSwitch);
+    if (switchElement) {
+      switchElement.firstChild.innerHTML = flag ? iconKeys.switch_on : iconKeys.switch_off;
+      switchElement.style.color = flag ? styles.colors.switchActiveColor : '';
+    }
+    lsSetItem(lsKeys.switch.id, flag);
+  }
+  function onSliderChange$1(val, opts) {
+    var _opts$lsKey;
+    onSliderChangeLabel$1(opts.label != null ? opts.label : val, opts);
+    if ((_opts$lsKey = opts.lsKey) !== null && _opts$lsKey !== void 0 && _opts$lsKey.id && lsCheckSet(opts.lsKey.id, val)) {
+      var needReload = opts.needReload === undefined ? true : opts.needReload;
+      if (opts.isManual) {
+        return;
+      }
+      console.log("".concat(opts.lsKey.id, " changed to ").concat(val, ", needReload: ").concat(needReload));
+      if (needReload) {
+        changeFontStylePreview();
+        loadDanmaku(LOAD_TYPE.RELOAD);
+      }
+    }
+  }
+  function onSliderChangeLabel$1(val, opts) {
+    if (opts !== null && opts !== void 0 && opts.labelId) {
+      var el = getById(opts.labelId);
+      if (el) el.innerText = val;
+    }
+    if (opts !== null && opts !== void 0 && opts.labelEle) {
+      opts.labelEle.innerText = val;
+    }
+  }
+  function changeFontStylePreview() {
+    var _styles$fontStyles$ls;
+    var fontStylePreview = getById(eleIds.fontStylePreview);
+    if (!fontStylePreview) return;
+    var fontWeight = lsGetItem(lsKeys.fontWeight.id);
+    var fontStyle = ((_styles$fontStyles$ls = styles.fontStyles[lsGetItem(lsKeys.fontStyle.id)]) === null || _styles$fontStyles$ls === void 0 ? void 0 : _styles$fontStyles$ls.id) || 'normal';
+    var fontFamily = lsGetItem(lsKeys.fontFamily.id);
+    var fontOpacity = Math.round(lsGetItem(lsKeys.fontOpacity.id) * 255).toString(16).padStart(2, '0');
+    var baseColor = Number(styles.colors.info).toString(16).padStart(6, '0');
+    var color = "".concat(baseColor).concat(fontOpacity);
+    var shadowColor = baseColor === '000000' ? "#ffffff".concat(fontOpacity) : "#000000".concat(fontOpacity);
+    var fontSizeReferent = fontStylePreview.previousElementSibling;
+    var fontSize = fontSizeReferent ? parseFloat(getComputedStyle(fontSizeReferent).fontSize.replace('px', '')) : 16;
+    var cmtStyle = getCommentStyle(color, shadowColor, fontStyle, fontWeight, fontSize, fontFamily);
+    Object.assign(fontStylePreview.style, cmtStyle);
+  }
+  function buildFontFamilyCtrl(container) {
+    var fontFamilyCtrl = getById(eleIds.fontFamilyCtrl, container);
+    if (!fontFamilyCtrl) return;
+    fontFamilyCtrl.innerHTML = '';
+    fontFamilyCtrl.append(embyButton({
+      label: '切换手填',
+      iconKey: iconKeys.edit
+    }, function (e) {
+      var xChecked = !e.target.xChecked;
+      e.target.xChecked = xChecked;
+      e.target.title = xChecked ? '手填' : '选择';
+      var selectEl = getById(eleIds.fontFamilySelect);
+      var inputEl = getById(eleIds.fontFamilyInput);
+      if (selectEl) selectEl.style.display = xChecked ? 'none' : '';
+      if (inputEl) inputEl.style.display = xChecked ? '' : 'none';
+      if (xChecked) {
+        var labelEl = getById(eleIds.fontFamilyLabel);
+        if (labelEl) labelEl.innerHTML = '';
+      }
+    }));
+    fontFamilyCtrl.append(embyButton({
+      label: '重置为默认',
+      iconKey: iconKeys.refresh
+    }, function () {
+      if (lsCheckSet(lsKeys.fontFamily.id, lsKeys.fontFamily.defaultValue)) {
+        changeFontStylePreview();
+        onSliderChangeLabel$1(lsKeys.fontFamily.defaultValue, {
+          labelId: eleIds.fontFamilyLabel
+        });
+        var inputEl = getById(eleIds.fontFamilyInput);
+        if (inputEl) inputEl.value = lsGetItem(lsKeys.fontFamily.id);
+        loadDanmaku(LOAD_TYPE.RELOAD);
+      }
+    }));
+  }
+  function resetFontFamilyDiv(selectedIndexOrValue, opts, container) {
+    var fontFamilyDiv = getById(eleIds.fontFamilyDiv, container);
+    if (!fontFamilyDiv) return;
+    fontFamilyDiv.innerHTML = '';
+    fontFamilyDiv.append(embySelect({
+      id: eleIds.fontFamilySelect,
+      label: "".concat(lsKeys.fontFamily.name, ": ")
+    }, selectedIndexOrValue, opts, 'family', 'family', function (value, index, option) {
+      if (lsCheckSet(lsKeys.fontFamily.id, value)) {
+        changeFontStylePreview();
+        var _labelVal = option.family !== option.fullName ? option.fullName : '';
+        onSliderChangeLabel$1(_labelVal, {
+          labelId: eleIds.fontFamilyLabel
+        });
+        loadDanmaku(LOAD_TYPE.RELOAD);
+      }
+    }, function (e) {
+      if ('queryLocalFonts' in window && opts.length <= 6) {
+        queryLocalFonts().then(function (fonts) {
+          var merged = [].concat(_toConsumableArray(opts), _toConsumableArray(fonts)).reduce(function (acc, font) {
+            if (!acc.some(function (f) {
+              return f.family === font.family;
+            })) acc.push(font);
+            return acc;
+          }, []);
+          var fontFamilyVal = lsGetItem(lsKeys.fontFamily.id);
+          var idx = merged.findIndex(function (f) {
+            return f.family === fontFamilyVal;
+          });
+          resetFontFamilyDiv(idx, merged, container);
+        }).catch(function (err) {
+          return console.error(err);
+        });
+        console.info('queryLocalFonts 高级查询 API 可用,已补充字体列表');
+      }
+    }));
+    fontFamilyDiv.append(embyInput({
+      id: eleIds.fontFamilyInput,
+      value: lsGetItem(lsKeys.fontFamily.id),
+      type: 'search',
+      style: 'display: none;'
+    }, function (e) {
+      var inputVal = getTargetInput(e).value.trim();
+      if (!inputVal) return;
+      if (lsCheckSet(lsKeys.fontFamily.id, inputVal)) {
+        changeFontStylePreview();
+        loadDanmaku(LOAD_TYPE.RELOAD);
+      }
+    }));
+    changeFontStylePreview();
+    var fontFamilyOpt = opts.find(function (opt) {
+      return opt.family === lsGetItem(lsKeys.fontFamily.id);
+    });
+    var labelVal = fontFamilyOpt ? fontFamilyOpt.fullName : '';
+    onSliderChangeLabel$1(labelVal, {
+      labelId: eleIds.fontFamilyLabel
+    });
+  }
+  function buildFontFamilySetting(container) {
+    var fontFamilyVal = lsGetItem(lsKeys.fontFamily.id);
+    var availableFonts = [{
+      family: lsKeys.fontFamily.defaultValue,
+      fullName: lsKeys.fontFamily.defaultValue
+    }, {
+      family: 'Consolas',
+      fullName: 'Consolas'
+    }, {
+      family: 'SimHei',
+      fullName: '黑体'
+    }, {
+      family: 'SimSun',
+      fullName: '宋体'
+    }, {
+      family: 'KaiTi',
+      fullName: '楷体'
+    }, {
+      family: 'Microsoft YaHei',
+      fullName: '微软雅黑'
+    }];
+    var selectedIndex = availableFonts.findIndex(function (f) {
+      return f.family === fontFamilyVal;
+    });
+    resetFontFamilyDiv(selectedIndex, availableFonts, container);
+    buildFontFamilyCtrl(container);
+  }
+  function buildFontStyleSetting(container) {
+    var parent = container || document;
+    var fontWeightDiv = getById(eleIds.danmakuFontWeightDiv, parent);
+    var fontStyleDiv = getById(eleIds.danmakuFontStyleDiv, parent);
+    if (fontWeightDiv) {
+      fontWeightDiv.append(embySlider({
+        lsKey: lsKeys.fontWeight
+      }, onSliderChange$1, onSliderChangeLabel$1));
+    }
+    if (fontStyleDiv) {
+      fontStyleDiv.append(embySlider({
+        lsKey: lsKeys.fontStyle
+      }, function (val, opts) {
+        opts.label = styles.fontStyles[val].id;
+        onSliderChange$1(val, opts);
+      }, function (val, opts) {
+        return onSliderChangeLabel$1(styles.fontStyles[val].id, opts);
+      }));
+    }
+    buildFontFamilySetting(container);
+  }
+  function buildSettingsBackup(container) {
+    var settingsCtrlEle = getById(eleIds.settingsCtrl, container);
+    if (!settingsCtrlEle) return;
+    settingsCtrlEle.append(embyButton({
+      label: '配置',
+      iconKey: iconKeys.more
+    }, function (e) {
+      var xChecked = !e.target.xChecked;
+      e.target.xChecked = xChecked;
+      e.target.title = xChecked ? '关闭' : '配置';
+      e.target.firstChild.innerHTML = xChecked ? iconKeys.close : iconKeys.more;
+      var settingsTextEle = getById(eleIds.settingsText);
+      if (settingsTextEle) {
+        settingsTextEle.style.display = xChecked ? '' : 'none';
+        if (xChecked) settingsTextEle.value = getSettingsJson(lsKeys, lsGetItem, 2);
+      }
+      [eleIds.settingReloadBtn, eleIds.settingsImportBtn].forEach(function (id) {
+        var el = getById(id);
+        if (el) el.style.display = xChecked ? '' : 'none';
+      });
+    }));
+    settingsCtrlEle.append(embyButton({
+      id: eleIds.settingReloadBtn,
+      label: '刷新',
+      iconKey: iconKeys.refresh,
+      style: 'display: none;'
+    }, function () {
+      var el = getById(eleIds.settingsText);
+      if (el) el.value = getSettingsJson(lsKeys, lsGetItem, 2);
+    }));
+    settingsCtrlEle.append(embyButton({
+      id: eleIds.settingsImportBtn,
+      label: '应用',
+      iconKey: iconKeys.done,
+      style: 'display: none;'
+    }, function () {
+      var textEl = getById(eleIds.settingsText);
+      if (textEl !== null && textEl !== void 0 && textEl.value) {
+        lsBatchSet(JSON.parse(textEl.value));
+        loadDanmaku(LOAD_TYPE.INIT);
+        closeEmbyDialog();
+      }
+    }));
+  }
+
+  /**
+   * 构建弹幕设置 Tab
+   * @param {string} containerId
+   */
+  function buildDanmakuSetting(containerId) {
+    var _nextEle$children;
+    var container = getById(containerId);
+    if (!container) return;
+    var template = "\n        <div style=\"display: flex; justify-content: center;\">\n            <div>\n                <div id=\"".concat(eleIds.danmakuSwitchDiv, "\" style=\"margin-bottom: 0.2em;\">\n                    <label class=\"").concat(classes.embyLabel, "\">").concat(lsKeys.switch.name, " </label>\n                </div>\n                <div style=\"").concat(styles.embySlider, "\">\n                    <label class=\"").concat(classes.embyLabel, "\" style=\"width: 5em;\">").concat(lsKeys.filterLevel.name, ": </label>\n                    <div id=\"").concat(eleIds.filterLevelDiv, "\" style=\"width: 15.5em; text-align: center;\"></div>\n                    <label style=\"").concat(styles.embySliderLabel, "\"></label>\n                </div>\n                <div style=\"").concat(styles.embySlider, "\">\n                    <label class=\"").concat(classes.embyLabel, "\" style=\"width: 5em;\">").concat(lsKeys.heightPercent.name, ": </label>\n                    <div id=\"").concat(eleIds.heightPercentDiv, "\" style=\"width: 15.5em; text-align: center;\"></div>\n                    <label>\n                        <label style=\"").concat(styles.embySliderLabel, "\"></label>\n                        <label>%</label>\n                    </label>\n                </div>\n                <div style=\"").concat(styles.embySlider, "\">\n                    <label class=\"").concat(classes.embyLabel, "\" style=\"width: 5em;\">").concat(lsKeys.fontSizeRate.name, ": </label>\n                    <div id=\"").concat(eleIds.danmakuSizeDiv, "\" style=\"width: 15.5em; text-align: center;\"></div>\n                    <label>\n                        <label style=\"").concat(styles.embySliderLabel, "\"></label>\n                        <label>\u500D</label>\n                    </label>\n                </div>\n                <div style=\"").concat(styles.embySlider, "\">\n                    <label class=\"").concat(classes.embyLabel, "\" style=\"width: 5em;\">").concat(lsKeys.fontOpacity.name, ": </label>\n                    <div id=\"").concat(eleIds.danmakuOpacityDiv, "\" style=\"width: 15.5em; text-align: center;\"></div>\n                    <label style=\"").concat(styles.embySliderLabel, "\"></label>\n                </div>\n                <div style=\"").concat(styles.embySlider, "\">\n                    <label class=\"").concat(classes.embyLabel, "\" style=\"width: 5em;\">").concat(lsKeys.speed.name, ": </label>\n                    <div id=\"").concat(eleIds.danmakuSpeedDiv, "\" style=\"width: 15.5em; text-align: center;\"></div>\n                    <label>\n                        <label style=\"").concat(styles.embySliderLabel, "\"></label>\n                        <label>\u500D</label>\n                    </label>\n                </div>\n                <div style=\"").concat(styles.embySlider, "\">\n                    <label class=\"").concat(classes.embyLabel, "\" style=\"width: 5em;\">").concat(lsKeys.timelineOffset.name, ": </label>\n                    <div id=\"").concat(eleIds.timelineOffsetDiv, "\" style=\"width: 15.5em; text-align: center;\"></div>\n                    <label style=\"").concat(styles.embySliderLabel, "\"></label>\n                </div>\n                <div is=\"emby-collapse\" title=\"\u5F39\u5E55\u5B57\u4F53\u6837\u5F0F\" data-expanded=\"false\">\n                    <div class=\"").concat(classes.collapseContentNav, "\">\n                        <div style=\"").concat(styles.embySlider, "\">\n                            <label class=\"").concat(classes.embyLabel, "\" style=\"width: 5em;\">").concat(lsKeys.fontWeight.name, ": </label>\n                            <div id=\"").concat(eleIds.danmakuFontWeightDiv, "\" style=\"width: 15.5em; text-align: center;\"></div>\n                            <label style=\"").concat(styles.embySliderLabel, "\"></label>\n                        </div>\n                        <div style=\"").concat(styles.embySlider, "\">\n                            <label class=\"").concat(classes.embyLabel, "\" style=\"width: 5em;\">").concat(lsKeys.fontStyle.name, ": </label>\n                            <div id=\"").concat(eleIds.danmakuFontStyleDiv, "\" style=\"width: 15.5em; text-align: center;\"></div>\n                            <label style=\"").concat(styles.embySliderLabel, "\"></label>\n                        </div>\n                        <div id=\"").concat(eleIds.fontFamilyCtrl, "\" style=\"margin: 0.6em 0;\"></div>\n                        <div style=\"").concat(styles.embySlider, "\">\n                            <label class=\"").concat(classes.embyLabel, "\" style=\"width: 5em;\">").concat(lsKeys.fontFamily.name, ": </label>\n                            <div id=\"").concat(eleIds.fontFamilyDiv, "\" class=\"").concat(classes.embySelectWrapper, "\"></div>\n                            <label id=\"").concat(eleIds.fontFamilyLabel, "\" style=\"width: 10em; margin-left: 1em;\"></label>\n                        </div>\n                        <div style=\"max-width: 31.5em;\">\n                            <label class=\"").concat(classes.embyLabel, "\" style=\"width: 5em;\">\u5F39\u5E55\u5916\u89C2: </label>\n                            <div id=\"").concat(eleIds.fontStylePreview, "\"\n                                class=\"flex justify-content-center\"\n                                style=\"border: .08em solid gray;color: black;border-radius: .24em;padding: .5em;;background-color: #6a96bd;\">\n                                \u7B80\u4E2D/\u7E41\u9AD4/English/\u3053\u3093\u306B\u3061\u306F\u30A6\u30A9\u30EB\u30C9/</br>\n                                ABC/abc/012/~!@<?>[]/\u300A\uFF1F\u300B\u3010\u3011</br>\n                                \u2606*: .\uFF61. o(\u2267\u25BD\u2266)o .\uFF61.:*\u2606</br>\n                                emoji:\uD83D\uDE06\uD83D\uDC4F\uD83C\uDF88\uD83C\uDF4B\uD83C\uDF1E\u2049\uFE0F\uD83C\uDF89</br>\n                            </div>\n                            <div class=\"").concat(classes.embyFieldDesc, "\">\n                                \u8FD9\u4E9B\u8BBE\u7F6E\u4F1A\u5F71\u54CD\u6B64\u8BBE\u5907\u4E0A\u7684\u5F39\u5E55\u5916\u89C2,\u6B64\u5904\u56FA\u5B9A\u4E3A dom \u5F15\u64CE,\n                                canvas \u5F15\u64CE\u6548\u679C\u4E00\u6837,\u6B64\u5904\u4E0D\u505A\u5207\u6362\u5C55\u793A,\n                                \u56E0\u4E3A\u5F39\u5E55\u5927\u5C0F\u662F\u6839\u636E\u64AD\u653E\u9875\u6B21\u6807\u9898\u52A8\u6001\u8BA1\u7B97\u7684,\u6B64\u5904\u4E0D\u505A\u53C2\u8003,\n                                \u9009\u62E9\u6216\u8F93\u5165\u7684\u5B57\u4F53\u662F\u5426\u6709\u6548\u53D6\u51B3\u4E8E\u8BBE\u5907\u672C\u8EAB\u7684\u5B57\u4F53\u5E93,\u6CA1\u6709\u7F51\u7EDC\u52A0\u8F7D\n                            </div>\n                        </div>\n                    </div>\n                </div>\n                <div id=\"").concat(eleIds.settingsCtrl, "\" style=\"margin: 0.6em 0;\"></div>\n                <textarea id=\"").concat(eleIds.settingsText, "\" style=\"display: none;resize: vertical;width: 100%\" rows=\"20\"\n                    is=\"emby-textarea\" class=\"txtOverview emby-textarea\"></textarea>\n            </div>\n        </div>\n    ");
+    container.innerHTML = template.trim();
+    getById(eleIds.danmakuSwitchDiv, container).prepend(embyButton({
+      id: eleIds.danmakuSwitch,
+      label: '弹幕开关',
+      iconKey: lsGetItem(lsKeys.switch.id) ? iconKeys.switch_on : iconKeys.switch_off,
+      style: (lsGetItem(lsKeys.switch.id) ? 'color:#52b54b;' : '') + 'font-size:1.5em;padding:0;'
+    }, doDanmakuSwitch$1));
+    getById(eleIds.filterLevelDiv, container).append(embySlider({
+      lsKey: lsKeys.filterLevel
+    }, onSliderChange$1, onSliderChangeLabel$1));
+    getById(eleIds.heightPercentDiv, container).append(embySlider({
+      lsKey: lsKeys.heightPercent
+    }, onSliderChange$1, onSliderChangeLabel$1));
+    getById(eleIds.danmakuSizeDiv, container).append(embySlider({
+      lsKey: lsKeys.fontSizeRate
+    }, onSliderChange$1, onSliderChangeLabel$1));
+    getById(eleIds.danmakuOpacityDiv, container).append(embySlider({
+      lsKey: lsKeys.fontOpacity
+    }, onSliderChange$1, onSliderChangeLabel$1));
+    getById(eleIds.danmakuSpeedDiv, container).append(embySlider({
+      lsKey: lsKeys.speed
+    }, onSliderChange$1, onSliderChangeLabel$1));
+    var btnContainer = getById(eleIds.timelineOffsetDiv, container);
+    var nextEle = btnContainer === null || btnContainer === void 0 ? void 0 : btnContainer.nextElementSibling;
+    var labelEle = (nextEle === null || nextEle === void 0 || (_nextEle$children = nextEle.children) === null || _nextEle$children === void 0 ? void 0 : _nextEle$children.length) > 0 ? nextEle.children[0] : nextEle;
+    var timelineOffsetOpts = {
+      lsKey: lsKeys.timelineOffset,
+      labelEle: labelEle
+    };
+    onSliderChangeLabel$1(lsGetItem(lsKeys.timelineOffset.id), timelineOffsetOpts);
+    timeOffsetBtns.forEach(function (btn) {
+      btnContainer === null || btnContainer === void 0 || btnContainer.append(embyButton(btn, function (e) {
+        if (e.target) {
+          var oldValue = lsGetItem(lsKeys.timelineOffset.id);
+          var newValue = oldValue + (parseFloat(e.target.getAttribute('valueOffset')) || 0);
+          if (newValue === oldValue) newValue = 0;
+          onSliderChange$1(newValue, timelineOffsetOpts);
+        }
+      }));
+    });
+    buildFontStyleSetting(container);
+    buildSettingsBackup(container);
+  }
+
+  async function doDanmakuSearchEpisode() {
+    var _allAnimes$selectAnim;
+    var embySearch = getById(eleIds.danmakuSearchName);
+    if (!embySearch) return;
+    var searchName = embySearch.value.trim();
+    var danmakuRemarkEle = getById(eleIds.danmakuRemark);
+    if (danmakuRemarkEle) {
+      danmakuRemarkEle.parentNode.hidden = false;
+      danmakuRemarkEle.innerText = searchName ? '' : '请填写标题';
+    }
+    var spinnerEle = getByClass(classes.mdlSpinner);
+    if (spinnerEle) spinnerEle.classList.remove('hide');
+    var apiPriority = lsGetItem(lsKeys.apiPriority.id);
+    var apiConfigs = {
+      official: {
+        name: '官方API',
+        prefix: corsProxy + 'https://api.dandanplay.net/api/v2',
+        enabled: lsGetItem(lsKeys.useOfficialApi.id)
+      },
+      custom: {
+        name: '自定义API',
+        prefix: lsGetItem(lsKeys.customApiPrefix.id),
+        enabled: lsGetItem(lsKeys.useCustomApi.id)
+      }
+    };
+    var allAnimes = [];
+    var _iterator = _createForOfIteratorHelper(apiPriority),
+      _step;
+    try {
+      var _loop = async function _loop() {
+        var apiKey = _step.value;
+        var config = apiConfigs[apiKey];
+        if (!config || !config.enabled || apiKey === 'custom' && !config.prefix) return 1; // continue
+        var manualSearchTitle = searchName;
+        var manualSearchEpisode = null;
+        if (apiKey === 'official') {
+          var parsed = parseAnimeName(searchName);
+          if (parsed.season !== null) {
+            manualSearchTitle = parsed.season === 1 ? parsed.title : "".concat(parsed.title, " \u7B2C").concat(parsed.season, "\u5B63");
+            manualSearchEpisode = parsed.episode;
+            console.log("[\u624B\u52A8\u5339\u914D][\u5B98\u65B9API\u4F18\u5316] \u683C\u5F0F\u5316\u641C\u7D22: \u6807\u9898='".concat(manualSearchTitle, "', \u96C6\u6570=").concat(manualSearchEpisode));
+          }
+        }
+        console.log("[\u624B\u52A8\u5339\u914D][".concat(config.name, "] \u6B63\u5728\u641C\u7D22: \u6807\u9898='").concat(manualSearchTitle, "', \u96C6\u6570=").concat(manualSearchEpisode || '无'));
+        var animaInfo = await fetchSearchEpisodes(manualSearchTitle, manualSearchEpisode, config.prefix);
+        if (animaInfo && animaInfo.animes.length > 0) {
+          console.log("[\u624B\u52A8\u5339\u914D][".concat(config.name, "] \u641C\u7D22\u6210\u529F\uFF0C\u627E\u5230 ").concat(animaInfo.animes.length, " \u4E2A\u7ED3\u679C\u3002"));
+          animaInfo.animes.forEach(function (anime) {
+            anime.apiPrefix = config.prefix;
+            anime.apiName = config.name;
+          });
+          allAnimes.push.apply(allAnimes, _toConsumableArray(animaInfo.animes));
+        } else {
+          console.log("[\u624B\u52A8\u5339\u914D][".concat(config.name, "] \u672A\u627E\u5230\u7ED3\u679C\u3002"));
+        }
+      };
+      for (_iterator.s(); !(_step = _iterator.n()).done;) {
+        if (await _loop()) continue;
+      }
+    } catch (err) {
+      _iterator.e(err);
+    } finally {
+      _iterator.f();
+    }
+    if (spinnerEle) spinnerEle.classList.add('hide');
+    if (allAnimes.length < 1) {
+      if (danmakuRemarkEle) danmakuRemarkEle.innerText = '搜索结果为空';
+      var _switchBtn = getById(eleIds.danmakuSwitchEpisode);
+      if (_switchBtn) _switchBtn.disabled = true;
+      var _episodeFlag = getById(eleIds.danmakuEpisodeFlag);
+      if (_episodeFlag) _episodeFlag.hidden = true;
+      return;
+    }
+    if (danmakuRemarkEle) danmakuRemarkEle.innerText = '';
+    var danmakuAnimeDiv = getById(eleIds.danmakuAnimeDiv);
+    var danmakuEpisodeNumDiv = getById(eleIds.danmakuEpisodeNumDiv);
+    if (!danmakuAnimeDiv || !danmakuEpisodeNumDiv) return;
+    danmakuAnimeDiv.innerHTML = '';
+    danmakuEpisodeNumDiv.innerHTML = '';
+    window.ede.searchDanmakuOpts.animes = allAnimes;
+    var selectAnimeIdx = allAnimes.findIndex(function (anime) {
+      return anime.animeId == window.ede.searchDanmakuOpts.animeId;
+    });
+    selectAnimeIdx = selectAnimeIdx !== -1 ? selectAnimeIdx : 0;
+    var animeSelect = embySelect({
+      id: eleIds.danmakuAnimeSelect,
+      label: '剧集: ',
+      style: 'width: auto;max-width: 100%;'
+    }, selectAnimeIdx, allAnimes, 'animeId', function (opt) {
+      return "".concat(opt.animeTitle, " \u7C7B\u578B\uFF1A").concat(opt.typeDescription, " \u6765\u6E90\uFF1A").concat(opt.apiName);
+    }, doDanmakuAnimeSelect);
+    danmakuAnimeDiv.append(animeSelect);
+    var episodes = ((_allAnimes$selectAnim = allAnimes[selectAnimeIdx]) === null || _allAnimes$selectAnim === void 0 ? void 0 : _allAnimes$selectAnim.episodes) || [];
+    var episodeNumSelect = embySelect({
+      id: eleIds.danmakuEpisodeNumSelect,
+      label: '集数: ',
+      style: 'width: auto;max-width: 100%;'
+    }, window.ede.searchDanmakuOpts.episode - 1, episodes, 'episodeId', function (opt, i) {
+      return "".concat(i + 1, " - ").concat(opt.episodeTitle);
+    });
+    danmakuEpisodeNumDiv.append(episodeNumSelect);
+    var episodeFlag = getById(eleIds.danmakuEpisodeFlag);
+    if (episodeFlag) episodeFlag.hidden = false;
+    var switchBtn = getById(eleIds.danmakuSwitchEpisode);
+    if (switchBtn) switchBtn.disabled = false;
+    var selectedAnime = allAnimes[selectAnimeIdx];
+    var searchImg = getById(eleIds.searchImg);
+    if (searchImg) searchImg.src = selectedAnime.imageUrl || dandanplayApi.posterImg(selectedAnime.animeId);
+    var apiSourceDiv = getById(eleIds.searchApiSource);
+    if (apiSourceDiv) apiSourceDiv.innerText = "\u6765\u6E90: ".concat(selectedAnime.apiName);
+  }
+  function doSearchTitleSwtich(e) {
+    var searchInputEle = getById(eleIds.danmakuSearchName);
+    var attrKey = 'isOriginalTitle';
+    if ('1' === e.target.getAttribute(attrKey)) {
+      e.target.setAttribute(attrKey, '0');
+      searchInputEle.value = window.ede.searchDanmakuOpts.animeName;
+      return;
+    }
+    var _window$ede$searchDan = window.ede.searchDanmakuOpts,
+      _episode_key = _window$ede$searchDan._episode_key,
+      seriesOrMovieId = _window$ede$searchDan.seriesOrMovieId;
+    var episode_info = JSON.parse(localStorage.getItem(_episode_key) || '{}');
+    var animeOriginalTitle = episode_info.animeOriginalTitle;
+    if (animeOriginalTitle) {
+      e.target.setAttribute(attrKey, '1');
+      searchInputEle.value = animeOriginalTitle;
+      return;
+    }
+    if (typeof ApiClient !== 'undefined') {
+      ApiClient.getItem(ApiClient.getCurrentUserId(), seriesOrMovieId).then(function (item) {
+        if (item !== null && item !== void 0 && item.OriginalTitle) {
+          e.target.setAttribute(attrKey, '1');
+          searchInputEle.value = item.OriginalTitle;
+          episode_info.animeOriginalTitle = item.OriginalTitle;
+          localStorage.setItem(_episode_key, JSON.stringify(episode_info));
+          if (window.ede.episode_info) window.ede.episode_info.animeOriginalTitle = item.OriginalTitle;
+        }
+      });
+    }
+  }
+  function doDanmakuAnimeSelect(value, index, option) {
+    var numDiv = getById(eleIds.danmakuEpisodeNumDiv);
+    if (!numDiv) return;
+    numDiv.innerHTML = '';
+    var anime = window.ede.searchDanmakuOpts.animes[index];
+    var episodeNumSelect = embySelect({
+      id: eleIds.danmakuEpisodeNumSelect,
+      label: '集数: '
+    }, 0, anime.episodes, 'episodeId', function (opt, i) {
+      return "".concat(i + 1, " - ").concat(opt.episodeTitle);
+    });
+    episodeNumSelect.style.maxWidth = '100%';
+    numDiv.append(episodeNumSelect);
+    var searchImg = getById(eleIds.searchImg);
+    if (searchImg) searchImg.src = anime.imageUrl || dandanplayApi.posterImg(anime.animeId);
+    var apiSourceDiv = getById(eleIds.searchApiSource);
+    if (apiSourceDiv) apiSourceDiv.innerText = "\u6765\u6E90: ".concat(anime.apiName);
+  }
+  function doDanmakuSwitchEpisode() {
+    var animeSelect = getById(eleIds.danmakuAnimeSelect);
+    var episodeNumSelect = getById(eleIds.danmakuEpisodeNumSelect);
+    if (!animeSelect || !episodeNumSelect) return;
+    var anime = window.ede.searchDanmakuOpts.animes[animeSelect.selectedIndex];
+    var _window$ede$searchDan2 = window.ede.searchDanmakuOpts,
+      _episode_key = _window$ede$searchDan2._episode_key,
+      _season_key = _window$ede$searchDan2._season_key,
+      seriesOrMovieId = _window$ede$searchDan2.seriesOrMovieId;
+    var episodeInfo = {
+      episodeId: episodeNumSelect.value,
+      episodeTitle: episodeNumSelect.options[episodeNumSelect.selectedIndex].text,
+      episodeIndex: episodeNumSelect.selectedIndex,
+      bgmEpisodeIndex: episodeNumSelect.selectedIndex,
+      animeId: anime.animeId,
+      animeTitle: anime.animeTitle,
+      animeOriginalTitle: '',
+      imageUrl: anime.imageUrl,
+      seriesOrMovieId: seriesOrMovieId,
+      apiPrefix: anime.apiPrefix,
+      apiName: anime.apiName
+    };
+    var seasonInfo = {
+      name: anime.animeTitle,
+      episodeOffset: episodeNumSelect.selectedIndex - window.ede.searchDanmakuOpts.episode
+    };
+    writeLsSeasonInfo(_season_key, seasonInfo);
+    var useOfficialApi = lsGetItem(lsKeys.useOfficialApi.id);
+    var useCustomApi = lsGetItem(lsKeys.useCustomApi.id);
+    var apiPriority = lsGetItem(lsKeys.apiPriority.id);
+    var enabledApis = apiPriority.filter(function (apiKey) {
+      if (apiKey === 'official') return useOfficialApi;
+      if (apiKey === 'custom') return useCustomApi;
+      return false;
+    });
+    var unique_episode_key = lsLocalKeys.apiPrefix + "".concat(enabledApis.join('_'), "_") + _episode_key;
+    localStorage.setItem(unique_episode_key, JSON.stringify(episodeInfo));
+    if (window.ede.episode_info) {
+      Object.assign(window.ede.episode_info, episodeInfo);
+    } else {
+      window.ede.episode_info = episodeInfo;
+    }
+    window.ede.previous_episode_info = _objectSpread2({}, window.ede.episode_info);
+    console.log('手动匹配成功，已加载新弹幕信息:', episodeInfo);
+    loadDanmaku(LOAD_TYPE.RELOAD);
+    closeEmbyDialog();
+  }
+  function bindManualMatchButtons() {
+    var btnClearCache = getById(eleIds.clearLocalMatchCacheBtn);
+    if (!btnClearCache) return;
+    btnClearCache.addEventListener('click', function () {
+      var prefixesToClear = [lsLocalKeys.animeEpisodePrefix, lsLocalKeys.animeSeasonPrefix, lsLocalKeys.animePrefix, lsLocalKeys.bangumiEpInfoPrefix, lsLocalKeys.bangumiMe, lsLocalKeys.apiPrefix];
+      lsBatchRemove(prefixesToClear);
+      if (window.ede.episode_info) {
+        window.ede.episode_info.episodeId = null;
+        window.ede.episode_info.animeId = null;
+        window.ede.episode_info.animeTitle = null;
+        window.ede.episode_info.episodeTitle = null;
+      }
+      if (window.ede.searchDanmakuOpts) {
+        window.ede.searchDanmakuOpts.animes = [];
+        window.ede.searchDanmakuOpts.episodes = [];
+      }
+      embyToast({
+        text: '本地匹配缓存已清除,包括animeId、episodeId等所有匹配信息'
+      });
+      loadDanmaku(LOAD_TYPE.REFRESH);
+    });
+  }
+  function buildSearchEpisodeEle() {
+    var _window$ede$searchDan3;
+    var searchNameDiv = getById(eleIds.danmakuSearchNameDiv);
+    if (!searchNameDiv) return;
+    searchNameDiv.append(embyInput({
+      id: eleIds.danmakuSearchName,
+      value: ((_window$ede$searchDan3 = window.ede.searchDanmakuOpts) === null || _window$ede$searchDan3 === void 0 ? void 0 : _window$ede$searchDan3.animeName) || '',
+      type: 'search'
+    }, doDanmakuSearchEpisode));
+    searchNameDiv.append(embyButton({
+      label: '搜索',
+      iconKey: iconKeys.search
+    }, doDanmakuSearchEpisode));
+    searchNameDiv.append(embyButton({
+      label: '切换[原]标题',
+      iconKey: iconKeys.text_format
+    }, doSearchTitleSwtich));
+    var episodeLoad = getById(eleIds.danmakuEpisodeLoad);
+    if (episodeLoad) {
+      episodeLoad.append(embyButton({
+        id: eleIds.danmakuSwitchEpisode,
+        label: '加载弹幕',
+        iconKey: iconKeys.done
+      }, doDanmakuSwitchEpisode));
+    }
+    var currentMatchedDiv = getById(eleIds.currentMatchedDiv);
+    if (currentMatchedDiv) {
+      currentMatchedDiv.append(embyButton({
+        label: '取消匹配/清空弹幕',
+        iconKey: iconKeys.close
+      }, function () {
+        var _window$ede$episode_i;
+        if ((_window$ede$episode_i = window.ede.episode_info) !== null && _window$ede$episode_i !== void 0 && _window$ede$episode_i.episodeId) {
+          window.ede.episode_info.episodeId = null;
+        }
+        if (window.ede.danmaku) {
+          createDanmaku([]);
+        }
+        var label = currentMatchedDiv.querySelector('label');
+        if (label) label.textContent = '弹弹 play 总量: 0';
+      }));
+    }
+  }
+  function buildExtUrlsDiv() {
+    var _window$ede$episode_i2, _window$ede$danmuCach, _window$ede$extCommen;
+    var episodeId = ((_window$ede$episode_i2 = window.ede.episode_info) === null || _window$ede$episode_i2 === void 0 ? void 0 : _window$ede$episode_i2.episodeId) || null;
+    var comments = ((_window$ede$danmuCach = window.ede.danmuCache) === null || _window$ede$danmuCach === void 0 ? void 0 : _window$ede$danmuCach[episodeId]) || [];
+    var curExtCommentCache = ((_window$ede$extCommen = window.ede.extCommentCache) === null || _window$ede$extCommen === void 0 ? void 0 : _window$ede$extCommen[window.ede.itemId]) || {};
+    var allComments = comments.concat.apply(comments, _toConsumableArray(Object.values(curExtCommentCache)));
+    var extUrlsDiv = getById(eleIds.extUrlsDiv);
+    if (!extUrlsDiv) return;
+    extUrlsDiv.innerHTML = '';
+    objectEntries(curExtCommentCache).forEach(function (_ref) {
+      var _ref2 = _slicedToArray(_ref, 2),
+        key = _ref2[0],
+        val = _ref2[1];
+      var extUrlDiv = document.createElement('div');
+      extUrlDiv.append(embyButton({
+        label: '清空此加载',
+        iconKey: iconKeys.close
+      }, function (e) {
+        delete curExtCommentCache[key];
+        e.target.parentNode.remove();
+        createDanmaku(allComments.filter(function (c) {
+          return c.fromUrl !== key;
+        }));
+      }));
+      extUrlDiv.append(embyALink(key), document.createTextNode(" \u603B\u91CF: ".concat(val.length)));
+      extUrlsDiv.append(extUrlDiv);
+    });
+  }
+  async function onEnterExtComment(e) {
+    var extUrl = getTargetInput(e).value.trim();
+    if (!extUrl.startsWith('http')) {
+      embyToast({
+        text: '输入的 url 应以 http 开头!'
+      });
+      return;
+    }
+    addExtComments(extUrl);
+  }
+  async function addExtComments(extUrl, extComments) {
+    var _window$ede$danmuCach2;
+    var episode_info = window.ede.episode_info;
+    var episodeId = (episode_info === null || episode_info === void 0 ? void 0 : episode_info.episodeId) || null;
+    var comments = ((_window$ede$danmuCach2 = window.ede.danmuCache) === null || _window$ede$danmuCach2 === void 0 ? void 0 : _window$ede$danmuCach2[episodeId]) || [];
+    if (!extComments) {
+      extComments = await fetchExtcommentActual(extUrl, comments);
+    }
+    if (extComments.length === 0) {
+      embyToast({
+        text: '附加弹幕不能为空!'
+      });
+      return;
+    }
+    var allComments = comments.concat(extComments);
+    createDanmaku(allComments).then(function () {
+      var beforeLength = window.ede.commentsParsed.length - extComments.length;
+      embyToast({
+        text: "\u6B64\u6B21\u9644\u52A0\u603B\u91CF: ".concat(extComments.length, ", \u9644\u52A0\u524D\u603B\u91CF: ").concat(beforeLength, ", \u9644\u52A0\u540E\u603B\u91CF: ").concat(allComments.length)
+      });
+      console.log("\u9644\u52A0\u5F39\u5E55\u5C31\u4F4D, \u9644\u52A0\u524D\u603B\u91CF: ".concat(beforeLength));
+      buildExtUrlsDiv();
+    }).catch(function (err) {
+      return console.log(err);
+    });
+  }
+  function buildExtCommentDiv() {
+    var extCommentSearchDiv = getById(eleIds.extCommentSearchDiv);
+    if (!extCommentSearchDiv) return;
+    buildExtUrlsDiv();
+    extCommentSearchDiv.append(embyInput({
+      type: 'search',
+      placeholder: 'http(s)://'
+    }, onEnterExtComment));
+    extCommentSearchDiv.append(embyButton({
+      label: '搜索',
+      iconKey: iconKeys.search
+    }, onEnterExtComment));
+  }
+  function buildDanmuPluginDiv() {
+    var danmuPluginDiv = getById(eleIds.danmuPluginDiv);
+    if (!danmuPluginDiv) return;
+    danmuPluginDiv.append(embyCheckbox({
+      id: lsKeys.useFetchPluginXml.id,
+      name: lsKeys.useFetchPluginXml.id,
+      label: lsKeys.useFetchPluginXml.name
+    }, lsGetItem(lsKeys.useFetchPluginXml.id), function (checked) {
+      return lsSetItem(lsKeys.useFetchPluginXml.id, checked);
+    }));
+  }
+  function buildCustomApiDiv() {
+    var apiCheckboxListDiv = getById(eleIds.apiCheckboxListDiv);
+    if (!apiCheckboxListDiv) return;
+    apiCheckboxListDiv.append(embyCheckbox({
+      id: lsKeys.useOfficialApi.id,
+      name: lsKeys.useOfficialApi.id,
+      label: lsKeys.useOfficialApi.name
+    }, lsGetItem(lsKeys.useOfficialApi.id), function (checked) {
+      return lsSetItem(lsKeys.useOfficialApi.id, checked);
+    }));
+    apiCheckboxListDiv.append(embyCheckbox({
+      id: lsKeys.useCustomApi.id,
+      name: lsKeys.useCustomApi.id,
+      label: lsKeys.useCustomApi.name
+    }, lsGetItem(lsKeys.useCustomApi.id), function (checked) {
+      return lsSetItem(lsKeys.useCustomApi.id, checked);
+    }));
+    var apiPriorityDiv = getById(eleIds.apiPriorityDiv);
+    if (apiPriorityDiv) {
+      apiPriorityDiv.append(embyTabs(apiPriorityOpts, lsGetItem(lsKeys.apiPriority.id)[0], 'id', 'name', function (value, tabIndex) {
+        var currentPriority = lsGetItem(lsKeys.apiPriority.id);
+        var apiPriorityArr = apiPriorityOpts.map(function (opt) {
+          return opt.id;
+        });
+        var newPriority = currentPriority[0] === apiPriorityArr[1] ? [apiPriorityArr[0], apiPriorityArr[1]] : [apiPriorityArr[1], apiPriorityArr[0]];
+        lsSetItem(lsKeys.apiPriority.id, newPriority);
+        console.log('[API优先级] 切换为:', newPriority[0] === apiPriorityOpts[0].id ? apiPriorityOpts[0].name : apiPriorityOpts[1].name);
+      }));
+    }
+    var customApiPrefixInputDiv = getById(eleIds.customApiPrefixInputDiv);
+    if (customApiPrefixInputDiv) {
+      customApiPrefixInputDiv.append(embyInput({
+        id: 'customApiPrefixInput',
+        value: lsGetItem(lsKeys.customApiPrefix.id) || '',
+        type: 'search'
+      }, null, function (e) {
+        var val = e.target.value.trim();
+        lsSetItem(lsKeys.customApiPrefix.id, val);
+        embyToast({
+          text: '自定义API地址已保存',
+          secondaryText: val
+        });
+      }));
+    }
+  }
+
+  /**
+   * 构建手动匹配 Tab
+   * @param {string} containerId
+   */
+  function buildSearchEpisode(containerId) {
+    var _window$ede, _window$ede2;
+    var container = getById(containerId);
+    if (!container) return;
+    var episodeId = ((_window$ede = window.ede) === null || _window$ede === void 0 || (_window$ede = _window$ede.episode_info) === null || _window$ede === void 0 ? void 0 : _window$ede.episodeId) || null;
+    var comments = ((_window$ede2 = window.ede) === null || _window$ede2 === void 0 || (_window$ede2 = _window$ede2.danmuCache) === null || _window$ede2 === void 0 ? void 0 : _window$ede2[episodeId]) || [];
+    var template = "\n        <div>\n            <div>\n                <label class=\"".concat(classes.embyLabel, "\">\u6807\u9898: </label>\n                <div id=\"").concat(eleIds.danmakuSearchNameDiv, "\" style=\"display: flex;\"></div>\n            </div>\n            <div id=\"").concat(eleIds.danmakuEpisodeFlag, "\" hidden>\n                <div style=\"display: flex;\">\n                    <div style=\"width: 80%;\">\n                        <label class=\"").concat(classes.embyLabel, "\">\u5A92\u4F53\u540D: </label>\n                        <div id=\"").concat(eleIds.danmakuAnimeDiv, "\" class=\"").concat(classes.embySelectWrapper, "\"></div>\n                        <label class=\"").concat(classes.embyLabel, "\">\u5206\u96C6\u540D: </label>\n                        <div style=\"display: flex;\">\n                            <div id=\"").concat(eleIds.danmakuEpisodeNumDiv, "\" style=\"max-width: 90%;\" class=\"").concat(classes.embySelectWrapper, "\"></div>\n                            <div id=\"").concat(eleIds.danmakuEpisodeLoad, "\"></div>\n                        </div>\n                    </div>\n                    <div style=\"width: 20%; margin: 0 2%; text-align: center;\">\n                        <img id=\"").concat(eleIds.searchImg, "\" style=\"width: 100%; height: auto;\"\n                            loading=\"lazy\" decoding=\"async\" draggable=\"false\" class=\"coveredImage-noScale\"></img>\n                        <div id=\"").concat(eleIds.searchApiSource, "\" class=\"").concat(classes.embyFieldDesc, "\" style=\"margin-top: 0.5em;\">\n                        </div>\n                    </div>\n                </div>\n            </div>\n            <div hidden>\n                <label class=\"").concat(classes.embyLabel, "\" id=\"").concat(eleIds.danmakuRemark, "\"></label>\n            </div>\n            <div>\n                <h4>\u5339\u914D\u6E90</h4>\n                <div style=\"display: flex; justify-content: space-between; align-items: center;\">\n                    <div>\n                        <div id=\"").concat(eleIds.currentMatchedDiv, "\">\n                            <label class=\"").concat(classes.embyLabel, "\">\u5F39\u5F39 play \u603B\u91CF: ").concat(comments.length, "</label>\n                        </div>\n                        <label class=\"").concat(classes.embyLabel, "\">\u5F39\u5F39 play \u9644\u52A0\u7684\u7B2C\u4E09\u65B9 url: </label>\n                    </div>\n                    <button is=\"emby-button\" type=\"button\"\n                        class=\"").concat(classes.embyButtons.basic, "\" id=\"").concat(eleIds.clearLocalMatchCacheBtn, "\">\n                        \u6E05\u9664\u672C\u5730\u5339\u914D\u7F13\u5B58\n                    </button>\n                </div>\n                <div id=\"").concat(eleIds.extUrlsDiv, "\"></div>\n            </div>\n            <div is=\"emby-collapse\" title=\"\u9644\u52A0\u5F39\u5E55\">\n                <div class=\"").concat(classes.collapseContentNav, "\">\n                    <label class=\"").concat(classes.embyLabel, "\">\u5F39\u5F39 play \u652F\u6301\u89E3\u6790\u7684\u7B2C\u4E09\u65B9 url: </label>\n                    <div id=\"").concat(eleIds.extCommentSearchDiv, "\" style=\"display: flex;\"></div>\n                    <div class=\"").concat(classes.embyFieldDesc, "\">\n                        \u539F\u63A5\u53E3\u6587\u6863\u8BF4\u660E\u652F\u6301(\u5982A/B/C\u7AD9),\u81EA\u6D4B\u53E6\u5916\u652F\u6301[ \u7231\u5947\u827A\u89C6\u9891, \u817E\u8BAF\u89C6\u9891, \u4F18\u9177\u89C6\u9891, ],\u4E0D\u652F\u6301[ \u8292\u679C TV, ]\n                    </div>\n                    <div class=\"").concat(classes.embyFieldDesc, "\">\n                        \u4EC5[ \u7231\u5947\u827A\u89C6\u9891, ]\u9700\u8981\u6CE8\u610F\u7F51\u5740\u540E\u4E0D\u80FD\u5E26 ? \u7684\u53C2\u6570,\u5176\u4F59\u7F51\u5740\u5E26\u4E0D\u5E26\u90FD\u53EF\u4EE5\n                    </div>\n                    <div class=\"").concat(classes.embyFieldDesc, "\">\n                        \u8BE6\u7EC6\u7F51\u5740\u793A\u4F8B: \u5F39\u5F39 play PC \u5B98\u65B9\u5BA2\u6237\u7AEF -> \u6DFB\u52A0\u66F4\u591A\u5F39\u5E55 -> \u67E5\u770B\u652F\u6301\u89E3\u6790\u7684\u7F51\u5740\u793A\u4F8B\n                    </div>\n                </div>\n            </div>\n            <div is=\"emby-collapse\" title=\"\u670D\u52A1\u7AEF Danmu \u63D2\u4EF6\">\n                <div class=\"").concat(classes.collapseContentNav, "\">\n                    <div id=\"").concat(eleIds.danmuPluginDiv, "\" class=\"").concat(classes.embyCheckboxList, "\" style=\"").concat(styles.embyCheckboxList, "\"></div>\n                </div>\n            </div>\n            <div is=\"emby-collapse\" title=\"API\u9009\u62E9\u3001\u81EA\u5B9A\u4E49API\u914D\u7F6E\">\n                <div class=\"").concat(classes.collapseContentNav, "\">\n                    <div id=\"").concat(eleIds.apiCheckboxListDiv, "\" class=\"").concat(classes.embyCheckboxList, "\" style=\"").concat(styles.embyCheckboxList, " align-items: center;\">\n                    </div>\n                    <label class=\"").concat(classes.embyLabel, "\">").concat(lsKeys.apiPriority.name, ": </label>\n                    <div id=\"").concat(eleIds.apiPriorityDiv, "\" style=\"margin: 1% 0;\">\n                    </div>\n                    <label class=\"").concat(classes.embyLabel, "\">").concat(lsKeys.customApiPrefix.name, ": </label>\n                    <div id=\"").concat(eleIds.customApiPrefixInputDiv, "\" style=\"display: flex;\">\n                    </div>\n                    <div class=\"").concat(classes.embyFieldDesc, "\">\n                        \u5982\u9700\u81EA\u5B9A\u4E49\u5F39\u5E55API\u5730\u5740,\u8BF7\u586B\u5199\u5B8C\u6574URL(\u5982 https://api.example.com ),<br>\u7559\u7A7A\u5219\u4F7F\u7528\u539F\u751FAPI\n                    </div>\n                </div>\n            </div>\n        </div>\n    ");
+    container.innerHTML = template.trim();
+    buildSearchEpisodeEle();
+    buildExtCommentDiv();
+    buildDanmuPluginDiv();
+    bindManualMatchButtons();
+    buildCustomApiDiv();
+  }
+
+  /**
+   * Bangumi API 相关
+   * 从 ede.js 迁移，未修改原有实现逻辑
+   */
+
+  /**
+   * 修正 Bangumi 集数索引（番剧非第一季时）
+   * @param {number} currentBgmEpisodeIndex
+   * @param {object} danDanPlayBangumi
+   * @returns {number}
+   */
+  function offsetBgmEpisodeIndex(currentBgmEpisodeIndex, danDanPlayBangumi) {
+    if (!danDanPlayBangumi) {
+      return currentBgmEpisodeIndex;
+    }
+    var bangumiEp = danDanPlayBangumi.episodes[currentBgmEpisodeIndex];
+    if (!bangumiEp) {
+      console.log("\u672A\u5339\u914D\u5230 danDanPlayBangumi \u756A\u5267\u96C6\u6570,\u5267\u96C6\u4E0D\u4E3A\u7B2C\u4E00\u5B63,\u5C1D\u8BD5\u5207\u6362\u63A5\u53E3\u6570\u636E\u5339\u914D\u8FD4\u56DE\u4FEE\u6B63\u540E\u7684 bgmEpisodeIndex");
+      return danDanPlayBangumi.episodes.findIndex(function (ep) {
+        return ep.episodeNumber == currentBgmEpisodeIndex + 1;
+      });
+    } else {
+      return currentBgmEpisodeIndex;
+    }
+  }
+
+  /**
+   * 获取当前集对应的 Bangumi 关联信息
+   * @returns {Promise<object>}
+   */
+  async function getEpisodeBangumiRel() {
+    var episode_info = window.ede.episode_info;
+    var _bangumi_key = lsLocalKeys.bangumiEpInfoPrefix + episode_info.episodeId;
+    var bangumiInfoLs = localStorage.getItem(_bangumi_key);
+    if (bangumiInfoLs) {
+      bangumiInfoLs = JSON.parse(bangumiInfoLs);
+    }
+    var bangumiEpsRes = bangumiInfoLs ? bangumiInfoLs.bangumiEpsRes : null;
+    var subjectId = bangumiInfoLs ? bangumiInfoLs.subjectId : null;
+    var bangumiUrl = bangumiInfoLs ? bangumiInfoLs.bangumiUrl : null;
+    var animeId = episode_info.animeId;
+    if (!subjectId) {
+      if (!animeId) {
+        throw new Error('未获取到 animeId');
+      }
+      var danDanPlayBangumiRes = await fetchJson(dandanplayApi.getBangumi(animeId));
+      episode_info.bgmEpisodeIndex = offsetBgmEpisodeIndex(episode_info.bgmEpisodeIndex, danDanPlayBangumiRes.bangumi);
+      bangumiUrl = danDanPlayBangumiRes.bangumi.bangumiUrl;
+      if (!bangumiUrl) {
+        throw new Error('未请求到 bangumiUrl');
+      }
+      subjectId = parseInt(bangumiUrl.match(/\/(\d+)$/)[1]);
+    }
+    var episodeIndex = episode_info ? episode_info.episodeIndex : null;
+    var bgmEpisodeIndex = episode_info ? episode_info.bgmEpisodeIndex : null;
+    var bangumiInfo = {
+      animeId: animeId,
+      bangumiUrl: bangumiUrl,
+      subjectId: subjectId,
+      episodeIndex: episodeIndex,
+      bgmEpisodeIndex: bgmEpisodeIndex,
+      bangumiEpsRes: bangumiEpsRes,
+      _bangumi_key: _bangumi_key
+    };
+    window.ede.bangumiInfo = bangumiInfo;
+    localStorage.setItem(bangumiInfo._bangumi_key, JSON.stringify(bangumiInfo));
+    return bangumiInfo;
+  }
+
+  /**
+   * 提交 Bangumi 章节收藏状态为「看过」
+   * @param {string} token - Bangumi 个人令牌
+   * @returns {Promise<object>}
+   */
+  async function putBangumiEpStatus(token) {
+    var bangumiInfo = await getEpisodeBangumiRel();
+    var subjectId = bangumiInfo.subjectId,
+      bgmEpisodeIndex = bangumiInfo.bgmEpisodeIndex;
+    var episodeIndex = bgmEpisodeIndex ? bgmEpisodeIndex : bangumiInfo.episodeIndex;
+    console.log('准备校验 Bangumi 条目收藏状态是否为看过');
+    var bangumiMe = localStorage.getItem(lsLocalKeys.bangumiMe);
+    if (bangumiMe) {
+      bangumiMe = JSON.parse(bangumiMe);
+    } else {
+      bangumiMe = await fetchBangumiApiGetMe(token);
+    }
+    var msg = '';
+    var bangumiUserColl = null;
+    try {
+      bangumiUserColl = await fetchJson(bangumiApi.getUserCollection(bangumiMe.username, subjectId), {
+        token: token
+      });
+    } catch (error) {
+      console.warn('Bangumi 条目未收藏');
+    }
+    if (bangumiUserColl && bangumiUserColl.type === 2) {
+      msg = 'Bangumi 条目已为看过状态,跳过更新';
+      console.log(msg, bangumiUserColl);
+      throw new Error(msg);
+    }
+    console.log('准备修改 Bangumi 条目收藏状态为在看, 如果不存在则创建, 如果存在则修改');
+    var body = {
+      type: 3
+    };
+    await fetchJson(bangumiApi.postUserCollection(subjectId), {
+      token: token,
+      body: body
+    });
+    if (!bangumiInfo.bangumiEpsRes) {
+      var fetchUrl = bangumiApi.getUserSubjectEpisodeCollection(subjectId);
+      var bangumiEpsRes = await fetchJson(fetchUrl, {
+        token: token
+      });
+      bangumiInfo.bangumiEpsRes = bangumiEpsRes;
+      var _bangumiEpColl = bangumiEpsRes.data[episodeIndex];
+      if (!_bangumiEpColl) {
+        throw new Error('未匹配到 bangumiEpColl');
+      }
+    }
+    var bangumiEpColl = bangumiInfo.bangumiEpsRes.data[episodeIndex];
+    var bangumiEp = bangumiEpColl.episode;
+    if (bangumiEpColl.type === 2) {
+      msg = 'Bangumi 章节收藏已是看过状态,跳过更新';
+      console.log(msg, bangumiEp);
+      throw new Error(msg);
+    }
+    console.log('准备更新 Bangumi 章节收藏状态, 详情: ', bangumiEp);
+    body.type = 2;
+    await fetchJson(bangumiApi.putUserEpisodeCollection(bangumiEp.id), {
+      token: token,
+      body: body,
+      method: 'PUT'
+    });
+    bangumiEp.type = body.type;
+    console.log("\u6210\u529F\u66F4\u65B0 Bangumi \u7AE0\u8282\u6536\u85CF\u72B6\u6001, \u5728\u770B => \u770B\u8FC7, \u8BE6\u60C5: ", bangumiEp);
+    window.ede.bangumiInfo = bangumiInfo;
+    localStorage.setItem(bangumiInfo._bangumi_key, JSON.stringify(bangumiInfo));
+    return bangumiInfo;
+  }
+
+  /**
+   * 验证 Bangumi Token 并获取用户信息
+   * @param {string} bangumiToken
+   * @returns {Promise<object>}
+   */
+  async function fetchBangumiApiGetMe(bangumiToken) {
+    try {
+      var res = await fetchJson(bangumiApi.getMe(), {
+        token: bangumiToken
+      });
+      console.log('Bangumi Token 验证成功', res);
+      localStorage.setItem(lsLocalKeys.bangumiMe, JSON.stringify(res));
+      return res;
+    } catch (error) {
+      console.error('Bangumi Token 验证失败', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Bangumi 角色展示
+   * 从 ede.js buildExtInfo 中拆出，未修改原有实现逻辑
+   */
+
+  /**
+   * 渲染 Bangumi 角色与声优信息
+   * @param {HTMLElement} container - 容器元素
+   * @param {Array} characters - 角色数据数组
+   */
+  function renderBangumiCharacters(container, characters) {
+    characters.map(function (c) {
+      var characterDiv = document.createElement('div');
+      characterDiv.style = 'width: 31%; display: flex; margin: .5em;';
+      var embyImgButtonInner = embyImg(c.images.large, 'object-position: top;');
+      if (!c.images.large) {
+        embyImgButtonInner = embyI(iconKeys.person, classes.cardImageIcon);
+      }
+      characterDiv.append(embyImgButton(embyImgButtonInner));
+      var characterRightDiv = document.createElement('div');
+      characterRightDiv.style.marginLeft = '.5em';
+      var characterNameDiv = document.createElement('div');
+      characterNameDiv.textContent = c.relation + ': ' + c.name;
+      characterRightDiv.append(characterNameDiv);
+      var characterCvDiv = document.createElement('div');
+      characterCvDiv.textContent = 'CV: ' + c.actors.map(function (a) {
+        return a.name;
+      }).join();
+      if (c.actors[0]) {
+        characterCvDiv.append(embyImgButton(embyImg(c.actors[0].images.large)));
+      }
+      characterRightDiv.append(characterCvDiv);
+      characterDiv.append(characterRightDiv);
+      container.append(characterDiv);
+    });
+  }
+
   /**
    * 弹幕信息 Tab
    * 从 ede.js 迁移
@@ -3857,9 +4915,536 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
   }
 
   /**
-   * 高级设置 Tab
-   * 从 ede.js 迁移，占位实现，待阶段 5 事件整合后补全
+   * 播放 OSD 显示/隐藏事件
    */
+
+  /**
+   * 播放界面右下角显示弹幕信息（弹幕：xxx条 / 未匹配）
+   * 从 ede.js 4116-4140 行迁移
+   * @param {number} [loadSum] - 已加载弹幕数量，不传时从 window.ede 计算
+   */
+  function appendvideoOsdDanmakuInfo(loadSum) {
+    var _window$ede;
+    if (!lsGetItem(lsKeys.osdTitleEnable.id)) return;
+    var episode_info = ((_window$ede = window.ede) === null || _window$ede === void 0 ? void 0 : _window$ede.episode_info) || {};
+    var episodeId = episode_info.episodeId,
+      animeTitle = episode_info.animeTitle,
+      episodeTitle = episode_info.episodeTitle;
+    var videoOsdContainer = document.querySelector("".concat(mediaContainerQueryStr, " .videoOsdSecondaryText"));
+    var videoOsdDanmakuTitle = getById(eleIds.videoOsdDanmakuTitle, videoOsdContainer);
+    if (!videoOsdDanmakuTitle) {
+      videoOsdDanmakuTitle = document.createElement('h3');
+      videoOsdDanmakuTitle.id = eleIds.videoOsdDanmakuTitle;
+      videoOsdDanmakuTitle.classList.add(classes.videoOsdTitle);
+      videoOsdDanmakuTitle.style.cssText = 'margin-left: auto; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; position: absolute; right: 0px; bottom: 0px;';
+    }
+    var text = '弹幕：';
+    if (episodeId) {
+      var count = loadSum !== null && loadSum !== void 0 ? loadSum : window.ede ? getDanmakuComments(window.ede).length : 0;
+      text += "".concat(animeTitle, " - ").concat(episodeTitle, " - ").concat(count, "\u6761");
+    } else {
+      text += '未匹配';
+    }
+    videoOsdDanmakuTitle.innerText = text;
+    if (videoOsdContainer) {
+      videoOsdContainer.append(videoOsdDanmakuTitle);
+    }
+  }
+  function addHeaderClock() {
+    var _window$ede2;
+    var warpper = getByClass('headerMiddle');
+    var headerClockEle = getById('headerClock');
+    if (!warpper) return;
+    if (headerClockEle) headerClockEle.remove();
+    var clockElement = document.createElement('div');
+    clockElement.id = 'headerClock';
+    warpper.append(clockElement);
+    function updateClock() {
+      clockElement.textContent = new Date().toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    }
+    updateClock();
+    var intervalId = setInterval(updateClock, 1000);
+    if ((_window$ede2 = window.ede) !== null && _window$ede2 !== void 0 && _window$ede2.destroyIntervalIds) {
+      window.ede.destroyIntervalIds.push(intervalId);
+    }
+  }
+  function removeHeaderClock() {
+    var headerClockEle = getById('headerClock');
+    if (headerClockEle) headerClockEle.remove();
+    destroyAllInterval();
+  }
+  function onVideoOsdShow(e) {
+    console.log(e === null || e === void 0 ? void 0 : e.type, e);
+    if (lsGetItem(lsKeys.osdLineChartEnable.id)) {
+      buildProgressBarChart(20);
+    }
+    if (lsGetItem(lsKeys.osdHeaderClockEnable.id)) {
+      addHeaderClock();
+    }
+  }
+  function onVideoOsdHide(e) {
+    console.log(e === null || e === void 0 ? void 0 : e.type, e);
+    if (lsGetItem(lsKeys.osdHeaderClockEnable.id)) {
+      removeHeaderClock();
+    }
+  }
+
+  /**
+   * 自定义 URL 配置（从 localStorage 应用用户设置）
+   */
+  var customeUrlMsg1 = '限弹弹 play API 兼容结构';
+  var customeUrl = {
+    init: function init() {
+      customeUrl.mapping.forEach(function (obj) {
+        return obj.rewrite(lsGetItem(obj.lsKey.id));
+      });
+    },
+    mapping: [{
+      divId: eleIds.customeDanmakuDiv,
+      lsKey: lsKeys.customeDanmakuUrl,
+      rewrite: function rewrite(tl) {
+        return setRequireDanmakuPath(tl);
+      },
+      msg1: "\u9650 ".concat(openSourceLicense.danmaku.url, " \u517C\u5BB9\u7ED3\u6784"),
+      msg2: "Danmaku \u4F9D\u8D56\u8DEF\u5F84,index.html \u5F15\u5165\u7684\u548C\u7BE1\u6539\u7334\u73AF\u5883\u4E0D\u4F1A\u4F7F\u7528\u5230,\u4F9D\u8D56\u5DF2\u5185\u7F6E,\n                    \u4EC5\u5728\u88AB CustomCssJS \u6267\u884C\u7684\u7279\u6B8A\u73AF\u5883\u4E0B\u4F7F\u7528,\u652F\u6301\u76F8\u5BF9/\u7EDD\u5BF9/\u7F51\u7EDC\u8DEF\u5F84,\n                    \u9ED8\u8BA4\u662F\u76F8\u5BF9\u8DEF\u5F84\u7B49\u540C https://emby/web/ \u548C /system/dashboard-ui/ ,\u975E\u6D4F\u89C8\u5668\u5BA2\u6237\u7AEF\u5FC5\u987B\u4F7F\u7528\u7F51\u7EDC\u8DEF\u5F84"
+    }, {
+      divId: eleIds.customeCorsProxyDiv,
+      lsKey: lsKeys.customeCorsProxyUrl,
+      rewrite: function rewrite(tl) {
+        return setCorsProxy(tl);
+      },
+      msg1: '仅弹弹 play API 跨域使用,限 URL 前缀反代方式,例如 cf_worker',
+      msg2: '以下共用变量: { dandanplayApi.prefix: 反代前缀拼接的弹弹 play API 路径前缀, }'
+    }, {
+      divId: eleIds.customeGetCommentDiv,
+      lsKey: lsKeys.customeGetCommentUrl,
+      rewrite: function rewrite(tl) {
+        dandanplayApi.getComment = function (episodeId, chConvert) {
+          return eval('`' + tl + '`');
+        };
+      },
+      msg1: customeUrlMsg1,
+      msg2: '变量: { episodeId: 章节 ID, chConvert: 简繁转换, }'
+    }, {
+      divId: eleIds.customeGetExtcommentDiv,
+      lsKey: lsKeys.customeGetExtcommentUrl,
+      rewrite: function rewrite(tl) {
+        dandanplayApi.getExtcomment = function (url) {
+          return eval('`' + tl + '`');
+        };
+      },
+      msg1: customeUrlMsg1,
+      msg2: '变量: { url: 附加弹幕输入框中的网址, }'
+    }, {
+      divId: eleIds.customePosterImgDiv,
+      lsKey: lsKeys.customePosterImgUrl,
+      rewrite: function rewrite(tl) {
+        dandanplayApi.posterImg = function (animeId) {
+          return eval('`' + tl + '`');
+        };
+      },
+      msg1: customeUrlMsg1,
+      msg2: '变量: { animeId: 弹弹 play 的作品 ID, }'
+    }]
+  };
+
+  /**
+   * 高级设置 Tab
+   * 从 ede.js 迁移
+   */
+  var timeoutCallbackId;
+  var timeoutCallbackClear = function timeoutCallbackClear() {
+    return timeoutCallbackId && clearTimeout(timeoutCallbackId);
+  };
+  var timeoutCallbackTypeOpts = [{
+    id: '0',
+    name: '不启用',
+    onChange: function onChange() {
+      return timeoutCallbackClear();
+    }
+  }, {
+    id: '1',
+    name: '退出播放',
+    onChange: function onChange(ms) {
+      timeoutCallbackClear();
+      timeoutCallbackId = setTimeout(function () {
+        closeEmbyDialog();
+        if (typeof Emby !== 'undefined' && Emby.InputManager) {
+          Emby.InputManager.trigger('back');
+        }
+      }, ms);
+    }
+  }, {
+    id: '2',
+    name: '返回主页',
+    onChange: function onChange(ms) {
+      timeoutCallbackClear();
+      timeoutCallbackId = setTimeout(function () {
+        closeEmbyDialog();
+        if (typeof Emby !== 'undefined' && Emby.Page) {
+          Emby.Page.goHome();
+        }
+      }, ms);
+    }
+  }];
+  function onSliderChange(val, opts) {
+    var _opts$lsKey;
+    onSliderChangeLabel(opts.label != null ? opts.label : val, opts);
+    if ((_opts$lsKey = opts.lsKey) !== null && _opts$lsKey !== void 0 && _opts$lsKey.id && lsCheckSet(opts.lsKey.id, val)) {
+      var needReload = opts.needReload === undefined ? true : opts.needReload;
+      if (opts.isManual) return;
+      console.log("".concat(opts.lsKey.id, " changed to ").concat(val, ", needReload: ").concat(needReload));
+      if (needReload) loadDanmaku(LOAD_TYPE.RELOAD);
+    }
+  }
+  function onSliderChangeLabel(val, opts) {
+    if (opts !== null && opts !== void 0 && opts.labelId) {
+      var el = getById(opts.labelId);
+      if (el) el.innerText = val;
+    }
+    if (opts !== null && opts !== void 0 && opts.labelEle) opts.labelEle.innerText = val;
+  }
+  function doDanmakuTypeFilterSelect() {
+    var checkList = Array.from(document.getElementsByName(eleIds.danmakuTypeFilterSelectName)).filter(function (item) {
+      return item.checked;
+    }).map(function (item) {
+      return item.value;
+    });
+    lsSetItem(lsKeys.typeFilter.id, checkList);
+    loadDanmaku(LOAD_TYPE.RELOAD);
+  }
+  function doDanmakuSourceFilterSelect() {
+    var checkList = Array.from(document.getElementsByName(eleIds.danmakuSourceFilterSelectName)).filter(function (item) {
+      return item.checked;
+    }).map(function (item) {
+      return item.value;
+    });
+    lsSetItem(lsKeys.sourceFilter.id, checkList);
+    loadDanmaku(LOAD_TYPE.RELOAD);
+  }
+  function doDanmakuShowSourceSelect() {
+    var checkList = Array.from(document.getElementsByName(eleIds.danmakuShowSourceSelectName)).filter(function (item) {
+      return item.checked;
+    }).map(function (item) {
+      return item.value;
+    });
+    lsSetItem(lsKeys.showSource.id, checkList);
+    loadDanmaku(LOAD_TYPE.RELOAD);
+  }
+  function doDanmakuChConverChange(value) {
+    window.ede.chConvert = value.id;
+    lsSetItem(lsKeys.chConvert.id, window.ede.chConvert);
+    loadDanmaku(LOAD_TYPE.REFRESH);
+    console.log(value.name);
+  }
+  function doDanmakuEngineSelect(value) {
+    var selectedValue = value.id;
+    if (lsCheckSet(lsKeys.engine.id, selectedValue)) {
+      console.log("\u5DF2\u66F4\u6539\u5F39\u5E55\u5F15\u64CE\u4E3A: ".concat(selectedValue));
+      loadDanmaku(LOAD_TYPE.RELOAD);
+    }
+  }
+  function doDanmakuFilterKeywordsBtnClick(event) {
+    var _getById, _getById$checked, _getById2;
+    var btn = event.currentTarget;
+    if (btn) {
+      btn.style = '';
+      btn.disabled = true;
+    }
+    var keywords = ((_getById = getById(eleIds.filterKeywordsId)) === null || _getById === void 0 || (_getById = _getById.value) === null || _getById === void 0 ? void 0 : _getById.trim()) || '';
+    var enable = (_getById$checked = (_getById2 = getById(eleIds.filterKeywordsEnableId)) === null || _getById2 === void 0 ? void 0 : _getById2.checked) !== null && _getById$checked !== void 0 ? _getById$checked : false;
+    lsCheckSet(lsKeys.filterKeywordsEnable.id, enable);
+    if (!lsCheckSet(lsKeys.filterKeywords.id, keywords) && keywords === '') return;
+    loadDanmaku(LOAD_TYPE.RELOAD);
+  }
+  function updateFilterKeywordsBtn(btn, flag, keywords) {
+    var isSame = lsCheckOld(lsKeys.filterKeywordsEnable.id, flag) && lsCheckOld(lsKeys.filterKeywords.id, keywords);
+    if (btn) {
+      btn.firstChild.innerHTML = isSame ? iconKeys.done_disabled : iconKeys.done;
+      btn.disabled = isSame;
+    }
+  }
+  function buildDanmakuFilterSetting(container) {
+    var typeFilterDiv = getById(eleIds.danmakuTypeFilterDiv, container);
+    var sourceFilterDiv = getById(eleIds.danmakuSourceFilterDiv, container);
+    var showSourceDiv = getById(eleIds.danmakuShowSourceDiv, container);
+    if (typeFilterDiv) {
+      typeFilterDiv.append(embyCheckboxList('danmakuTypeFilterList', eleIds.danmakuTypeFilterSelectName, lsGetItem(lsKeys.typeFilter.id), Object.values(danmakuTypeFilterOpts).filter(function (o) {
+        return !o.hidden;
+      }), doDanmakuTypeFilterSelect));
+    }
+    if (sourceFilterDiv) {
+      sourceFilterDiv.append(embyCheckboxList('danmakuSourceFilterList', eleIds.danmakuSourceFilterSelectName, lsGetItem(lsKeys.sourceFilter.id), Object.values(danmakuSource), doDanmakuSourceFilterSelect));
+    }
+    if (showSourceDiv) {
+      showSourceDiv.append(embyCheckboxList('danmakuShowSourceList', eleIds.danmakuShowSourceSelectName, lsGetItem(lsKeys.showSource.id), Object.values(showSource), doDanmakuShowSourceSelect));
+    }
+    var autoFilterDiv = getById(eleIds.danmakuAutoFilterCountDiv);
+    if (autoFilterDiv) {
+      autoFilterDiv.append(embySlider({
+        lsKey: lsKeys.autoFilterCount
+      }, onSliderChange, onSliderChangeLabel));
+    }
+    var filterProDiv = getById(eleIds.danmakuFilterProDiv, container);
+    if (filterProDiv) {
+      filterProDiv.append(embyCheckbox({
+        id: 'mergeSimilarEnable',
+        name: 'mergeSimilarEnable',
+        label: labels.enable
+      }, lsGetItem(lsKeys.mergeSimilarEnable.id), function (checked) {
+        lsSetItem(lsKeys.mergeSimilarEnable.id, checked);
+        loadDanmaku(LOAD_TYPE.RELOAD);
+      }));
+    }
+    var mergePercentDiv = getById(eleIds.mergeSimilarPercentDiv);
+    if (mergePercentDiv) {
+      mergePercentDiv.append(embySlider({
+        lsKey: lsKeys.mergeSimilarPercent
+      }, onSliderChange, onSliderChangeLabel));
+    }
+    var mergeTimeDiv = getById(eleIds.mergeSimilarTimeDiv);
+    if (mergeTimeDiv) {
+      mergeTimeDiv.append(embySlider({
+        lsKey: lsKeys.mergeSimilarTime
+      }, onSliderChange, onSliderChangeLabel));
+    }
+    var keywordsContainer = getById(eleIds.filterKeywordsDiv, container);
+    if (keywordsContainer) {
+      var keywordsEnableDiv = keywordsContainer.appendChild(document.createElement('div'));
+      var keywordsBtn = embyButton({
+        label: '加载关键词过滤',
+        iconKey: iconKeys.done_disabled
+      }, doDanmakuFilterKeywordsBtnClick);
+      keywordsBtn.disabled = true;
+      keywordsEnableDiv.setAttribute('style', 'display: flex; justify-content: space-between; align-items: center; width: 100%;');
+      keywordsEnableDiv.append(embyCheckbox({
+        id: eleIds.filterKeywordsEnableId,
+        name: eleIds.filterKeywordsEnableId,
+        label: labels.enable
+      }, lsGetItem(lsKeys.filterKeywordsEnable.id), function (flag) {
+        var _getById3;
+        return updateFilterKeywordsBtn(keywordsBtn, flag, ((_getById3 = getById(eleIds.filterKeywordsId)) === null || _getById3 === void 0 || (_getById3 = _getById3.value) === null || _getById3 === void 0 ? void 0 : _getById3.trim()) || '');
+      }));
+      keywordsEnableDiv.appendChild(document.createElement('div')).appendChild(keywordsBtn);
+      keywordsContainer.appendChild(document.createElement('div')).appendChild(embyTextarea({
+        id: eleIds.filterKeywordsId,
+        value: lsGetItem(lsKeys.filterKeywords.id),
+        style: 'width: 100%;margin-top: 0.2em;',
+        rows: 8
+      }, function (event) {
+        var _getById$checked2, _getById4, _event$target;
+        return updateFilterKeywordsBtn(keywordsBtn, (_getById$checked2 = (_getById4 = getById(eleIds.filterKeywordsEnableId)) === null || _getById4 === void 0 ? void 0 : _getById4.checked) !== null && _getById$checked2 !== void 0 ? _getById$checked2 : false, ((_event$target = event.target) === null || _event$target === void 0 || (_event$target = _event$target.value) === null || _event$target === void 0 ? void 0 : _event$target.trim()) || '');
+      }));
+      var label = document.createElement('label');
+      label.innerText = "\u5173\u952E\u8BCD/\u6B63\u5219\u5339\u914D\u8FC7\u6EE4,\u652F\u6301\u8FC7\u6EE4[\u6B63\u6587,".concat(Object.values(showSource).map(function (o) {
+        return o.name;
+      }).join(), "],\u591A\u4E2A\u8868\u8FBE\u5F0F\u7528\u6362\u884C\u5206\u9694");
+      label.className = classes.embyFieldDesc;
+      keywordsContainer.appendChild(document.createElement('div')).appendChild(label);
+    }
+  }
+  function buildExtSetting(container) {
+    var chConverDiv = getById(eleIds.danmakuChConverDiv, container);
+    var engineDiv = getById(eleIds.danmakuEngineDiv, container);
+    if (chConverDiv) {
+      var _window$ede$chConvert, _window$ede;
+      chConverDiv.append(embyTabs(danmakuChConverOpts, (_window$ede$chConvert = (_window$ede = window.ede) === null || _window$ede === void 0 ? void 0 : _window$ede.chConvert) !== null && _window$ede$chConvert !== void 0 ? _window$ede$chConvert : lsGetItem(lsKeys.chConvert.id), 'id', 'name', doDanmakuChConverChange));
+    }
+    if (engineDiv) {
+      engineDiv.append(embyTabs(danmakuEngineOpts, lsGetItem(lsKeys.engine.id), 'id', 'name', doDanmakuEngineSelect));
+    }
+  }
+  function buildOsdSetting() {
+    var osdCheckboxDiv = getById(eleIds.osdCheckboxDiv);
+    var osdLineChartDiv = getById(eleIds.osdLineChartDiv);
+    var osdLineChartTimeDiv = getById(eleIds.osdLineChartTimeDiv);
+    if (osdCheckboxDiv) {
+      osdCheckboxDiv.append(embyCheckbox({
+        id: lsKeys.osdTitleEnable.id,
+        name: lsKeys.osdTitleEnable.id,
+        label: lsKeys.osdTitleEnable.name
+      }, lsGetItem(lsKeys.osdTitleEnable.id), function (checked) {
+        lsSetItem(lsKeys.osdTitleEnable.id, checked);
+        var videoOsdContainer = document.querySelector("".concat(mediaContainerQueryStr, " .videoOsdSecondaryText"));
+        var videoOsdDanmakuTitle = getById(eleIds.videoOsdDanmakuTitle, videoOsdContainer);
+        if (videoOsdDanmakuTitle) {
+          videoOsdDanmakuTitle.style.display = checked ? 'block' : 'none';
+        } else if (checked) {
+          appendvideoOsdDanmakuInfo(getDanmakuComments(window.ede).length);
+        }
+      }));
+      osdCheckboxDiv.append(embyCheckbox({
+        id: lsKeys.osdHeaderClockEnable.id,
+        name: lsKeys.osdHeaderClockEnable.id,
+        label: lsKeys.osdHeaderClockEnable.name
+      }, lsGetItem(lsKeys.osdHeaderClockEnable.id), function (checked) {
+        lsSetItem(lsKeys.osdHeaderClockEnable.id, checked);
+        checked ? addHeaderClock() : removeHeaderClock();
+      }));
+    }
+    if (osdLineChartDiv) {
+      osdLineChartDiv.append(embyCheckbox({
+        id: lsKeys.osdLineChartEnable.id,
+        name: lsKeys.osdLineChartEnable.id,
+        label: lsKeys.osdLineChartEnable.name
+      }, lsGetItem(lsKeys.osdLineChartEnable.id), function (checked) {
+        lsSetItem(lsKeys.osdLineChartEnable.id, checked);
+        var progressBarLineChart = getById(eleIds.progressBarLineChart);
+        if (progressBarLineChart) {
+          progressBarLineChart.style.display = checked ? 'block' : 'none';
+        } else if (checked) {
+          buildProgressBarChart(20);
+        }
+      }));
+      osdLineChartDiv.append(embyCheckbox({
+        id: lsKeys.osdLineChartSkipFilter.id,
+        name: lsKeys.osdLineChartSkipFilter.id,
+        label: lsKeys.osdLineChartSkipFilter.name
+      }, lsGetItem(lsKeys.osdLineChartSkipFilter.id), function (checked) {
+        lsSetItem(lsKeys.osdLineChartSkipFilter.id, checked);
+        buildProgressBarChart(20);
+      }));
+    }
+    if (osdLineChartTimeDiv) {
+      osdLineChartTimeDiv.append(embySlider({
+        lsKey: lsKeys.osdLineChartTime,
+        needReload: false
+      }, function (val, opts) {
+        onSliderChange(val, opts);
+        if (lsGetItem(lsKeys.osdLineChartEnable.id)) buildProgressBarChart(20);
+      }, onSliderChangeLabel));
+    }
+  }
+  function buildPlaySetting(container) {
+    var btnContainer = getById(eleIds.timeoutCallbackDiv, container);
+    var timeoutCallbacktOpts = {
+      labelId: eleIds.timeoutCallbackLabel,
+      key: lsKeys.timeoutCallbackValue.id,
+      needReload: false
+    };
+    onSliderChangeLabel(lsGetItem(lsKeys.timeoutCallbackValue.id), timeoutCallbacktOpts);
+    if (btnContainer) {
+      timeOffsetBtns.forEach(function (btn) {
+        btnContainer.append(embyButton(btn, function (e) {
+          if (e.target) {
+            var oldValue = lsGetItem(lsKeys.timeoutCallbackValue.id);
+            var newValue = oldValue + (parseFloat(e.target.getAttribute('valueOffset')) || 0);
+            if (newValue === oldValue || newValue < 0) newValue = 0;
+            onSliderChange(newValue, timeoutCallbacktOpts);
+          }
+        }));
+      });
+    }
+    var unitDiv = getById(eleIds.timeoutCallbackUnitDiv, container);
+    if (unitDiv) {
+      unitDiv.append(embyTabs(timeoutCallbackUnitOpts, lsGetItem(lsKeys.timeoutCallbackUnit.id), 'id', 'name', function (value, index) {
+        return lsSetItem(lsKeys.timeoutCallbackUnit.id, index);
+      }));
+    }
+    var typeDiv = getById(eleIds.timeoutCallbackTypeDiv, container);
+    if (typeDiv) {
+      typeDiv.append(embyTabs(timeoutCallbackTypeOpts, timeoutCallbackTypeOpts[0].id, 'id', 'name', function (value) {
+        var unitObj = timeoutCallbackUnitOpts[lsGetItem(lsKeys.timeoutCallbackUnit.id)];
+        value.onChange(lsGetItem(lsKeys.timeoutCallbackValue.id) * unitObj.msRate);
+      }));
+    }
+  }
+  function onEnterBangumiToken(e) {
+    var _getById5;
+    var bangumiToken = ((_getById5 = getById(eleIds.bangumiTokenInput)) === null || _getById5 === void 0 || (_getById5 = _getById5.value) === null || _getById5 === void 0 ? void 0 : _getById5.trim()) || '';
+    lsSetItem(lsKeys.bangumiToken.id, bangumiToken);
+    var label = getById(eleIds.bangumiTokenLabel);
+    fetchBangumiApiGetMe(bangumiToken).then(function () {
+      if (label) {
+        label.innerText = 'Bangumi Token 验证成功';
+        label.style.color = 'green';
+      }
+    }).catch(function (error) {
+      if (label) {
+        label.innerText = 'Bangumi Token 验证失败';
+        label.style.color = 'red';
+      }
+      throw error;
+    });
+  }
+  function buildBangumiSetting(container) {
+    var bangumiSettingsDiv = getById(eleIds.bangumiSettingsDiv, container);
+    var bangumiEnable = lsGetItem(lsKeys.bangumiEnable.id);
+    if (bangumiSettingsDiv) bangumiSettingsDiv.hidden = !bangumiEnable;
+    var bangumiEnableLabel = getById(eleIds.bangumiEnableLabel, container);
+    if (bangumiEnableLabel) {
+      bangumiEnableLabel.append(embyCheckbox({
+        id: lsKeys.bangumiEnable.id,
+        name: lsKeys.bangumiEnable.id,
+        label: lsKeys.bangumiEnable.name
+      }, bangumiEnable, function (checked) {
+        lsSetItem(lsKeys.bangumiEnable.id, checked);
+        if (bangumiSettingsDiv) bangumiSettingsDiv.hidden = !checked;
+      }));
+    }
+    var bangumiTokenInputDiv = getById(eleIds.bangumiTokenInputDiv, container);
+    if (bangumiTokenInputDiv) {
+      bangumiTokenInputDiv.append(embyInput({
+        id: eleIds.bangumiTokenInput,
+        type: 'password',
+        value: lsGetItem(lsKeys.bangumiToken.id)
+      }, onEnterBangumiToken));
+      bangumiTokenInputDiv.append(embyButton({
+        label: '校验',
+        iconKey: iconKeys.check
+      }, onEnterBangumiToken));
+    }
+    var bangumiPostPercentDiv = getById(eleIds.bangumiPostPercentDiv, container);
+    if (bangumiPostPercentDiv) {
+      bangumiPostPercentDiv.append(embySlider({
+        lsKey: lsKeys.bangumiPostPercent,
+        needReload: false
+      }, function (val, opts) {
+        return onSliderChange(val, opts);
+      }, onSliderChangeLabel));
+    }
+    var bangumiTokenLinkDiv = getById(eleIds.bangumiTokenLinkDiv, container);
+    if (bangumiTokenLinkDiv) {
+      bangumiTokenLinkDiv.append(embyALink(bangumiApi.accessTokenUrl, bangumiApi.accessTokenUrl));
+    }
+  }
+  function buildCustomUrlSetting(container) {
+    var customeUrlsDiv = getById(eleIds.customeUrlsDiv, container);
+    if (!customeUrlsDiv) return;
+    var getTemplate = function getTemplate(obj) {
+      return "\n        <label class=\"".concat(classes.embyLabel, "\">").concat(obj.lsKey.name, "(").concat(obj.msg1, "): </label>\n        <div id=\"").concat(obj.divId, "\" style=\"display: flex;\"></div>\n        <div class=\"").concat(classes.embyFieldDesc, "\">").concat(obj.msg2 || '', "</div>\n    ");
+    };
+    customeUrl.mapping.forEach(function (obj) {
+      customeUrlsDiv.innerHTML += getTemplate(obj);
+    });
+    customeUrl.mapping.forEach(function (obj) {
+      var inputDiv = getById(obj.divId, container);
+      if (!inputDiv) return;
+      var onEnter = function onEnter(e) {
+        var _target$value;
+        var target = getTargetInput(e);
+        var value = (target === null || target === void 0 || (_target$value = target.value) === null || _target$value === void 0 ? void 0 : _target$value.trim()) || '';
+        if (!value) {
+          value = obj.lsKey.defaultValue;
+          if (target) target.value = value;
+        }
+        lsSetItem(obj.lsKey.id, value);
+        obj.rewrite(value);
+      };
+      inputDiv.append(embyInput({
+        type: 'search',
+        value: lsGetItem(obj.lsKey.id)
+      }, onEnter));
+      inputDiv.append(embyButton({
+        label: '确认',
+        iconKey: iconKeys.check
+      }, onEnter));
+    });
+  }
 
   /**
    * 构建高级设置 Tab
@@ -3868,7 +5453,418 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
   function buildProSetting(containerId) {
     var container = getById(containerId);
     if (!container) return;
-    container.innerHTML = "\n        <div style=\"height: 30em;\">\n            <div is=\"emby-collapse\" title=\"\u5F39\u5E55\u5C4F\u853D\" data-expanded=\"true\">\n                <div class=\"".concat(classes.collapseContentNav, "\">\n                    <div id=\"").concat(eleIds.danmakuTypeFilterDiv, "\"></div>\n                </div>\n            </div>\n        </div>\n    ");
+    var template = "\n        <div style=\"height: 30em;\">\n            <div is=\"emby-collapse\" title=\"\u5F39\u5E55\u5C4F\u853D\" data-expanded=\"true\">\n                <div class=\"".concat(classes.collapseContentNav, "\">\n                    <div id=\"").concat(eleIds.danmakuTypeFilterDiv, "\" style=\"margin-bottom: 0.2em;\">\n                        <label class=\"").concat(classes.embyLabel, "\">").concat(lsKeys.typeFilter.name, ": </label>\n                    </div>\n                    <div id=\"").concat(eleIds.danmakuSourceFilterDiv, "\">\n                        <label class=\"").concat(classes.embyLabel, "\">").concat(lsKeys.sourceFilter.name, ": </label>\n                    </div>\n                    <div id=\"").concat(eleIds.danmakuShowSourceDiv, "\">\n                        <label class=\"").concat(classes.embyLabel, "\">").concat(lsKeys.showSource.name, ": </label>\n                    </div>\n                </div>\n            </div>\n            <div is=\"emby-collapse\" title=\"\u5F39\u5E55\u9AD8\u7EA7\u5C4F\u853D\">\n                <div class=\"").concat(classes.collapseContentNav, "\">\n                    <div>\n                        <div style=\"").concat(styles.embySlider, "\">\n                            <label class=\"").concat(classes.embyLabel, "\" style=\"width: 10em;\">").concat(lsKeys.autoFilterCount.name, ": </label>\n                            <div id=\"").concat(eleIds.danmakuAutoFilterCountDiv, "\" style=\"width: 15.5em; text-align: center;\"></div>\n                            <label style=\"").concat(styles.embySliderLabel, "\">0</label>\n                        </div>\n                        <label class=\"").concat(classes.embyLabel, "\">").concat(lsKeys.mergeSimilarEnable.name, ": </label>\n                        <div id=\"").concat(eleIds.danmakuFilterProDiv, "\" class=\"").concat(classes.embyCheckboxList, "\" style=\"").concat(styles.embyCheckboxList, "\"></div>\n                        <div style=\"").concat(styles.embySlider, "\">\n                            <label class=\"").concat(classes.embyLabel, "\" style=\"width: 10em;\">").concat(lsKeys.mergeSimilarPercent.name, ": </label>\n                            <div id=\"").concat(eleIds.mergeSimilarPercentDiv, "\" style=\"width: 15.5em; text-align: center;\"></div>\n                            <label><label style=\"").concat(styles.embySliderLabel, "\"></label><label>%</label></label>\n                        </div>\n                        <div style=\"").concat(styles.embySlider, "\">\n                            <label class=\"").concat(classes.embyLabel, "\" style=\"width: 10em;\">").concat(lsKeys.mergeSimilarTime.name, ": </label>\n                            <div id=\"").concat(eleIds.mergeSimilarTimeDiv, "\" style=\"width: 15.5em; text-align: center;\"></div>\n                            <label style=\"").concat(styles.embySliderLabel, "\">-1</label>\n                        </div>\n                    </div>\n                    <div id=\"").concat(eleIds.filterKeywordsDiv, "\" style=\"margin-bottom: 0.2em;\">\n                        <label class=\"").concat(classes.embyLabel, "\">").concat(lsKeys.filterKeywords.name, ": </label>\n                    </div>\n                </div>\n            </div>\n            <div is=\"emby-collapse\" title=\"\u989D\u5916\u8BBE\u7F6E\">\n                <div class=\"").concat(classes.collapseContentNav, "\" style=\"padding-top: 0.5em !important;\">\n                    <div id=\"").concat(eleIds.extCheckboxDiv, "\" class=\"").concat(classes.embyCheckboxList, "\" style=\"").concat(styles.embyCheckboxList, "\"></div>\n                    <div id=\"").concat(eleIds.danmakuChConverDiv, "\" style=\"margin-bottom: 0.2em;\">\n                        <label class=\"").concat(classes.embyLabel, "\">").concat(lsKeys.chConvert.name, ": </label>\n                    </div>\n                    <div id=\"").concat(eleIds.danmakuEngineDiv, "\" style=\"margin-bottom: 0.2em;\">\n                        <label class=\"").concat(classes.embyLabel, "\">").concat(lsKeys.engine.name, ": </label>\n                    </div>\n                </div>\n            </div>\n            <div is=\"emby-collapse\" title=\"\u64AD\u653E\u754C\u9762\u8BBE\u7F6E\">\n                <div class=\"").concat(classes.collapseContentNav, "\">\n                    <div id=\"").concat(eleIds.osdCheckboxDiv, "\" class=\"").concat(classes.embyCheckboxList, "\" style=\"").concat(styles.embyCheckboxList, "\"></div>\n                    <div>\n                        <div id=\"").concat(eleIds.osdLineChartDiv, "\" class=\"").concat(classes.embyCheckboxList, "\" style=\"").concat(styles.embyCheckboxList, "\"></div>\n                        <div style=\"").concat(styles.embySlider, "\">\n                            <label class=\"").concat(classes.embyLabel, "\" style=\"width: 12em;\">").concat(lsKeys.osdLineChartTime.name, ": </label>\n                            <div id=\"").concat(eleIds.osdLineChartTimeDiv, "\" style=\"width: 15.5em; text-align: center;\"></div>\n                            <label style=\"").concat(styles.embySliderLabel, "\"></label>\n                        </div>\n                    </div>\n                </div>\n            </div>\n            <div is=\"emby-collapse\" title=\"\u64AD\u653E\u8BBE\u7F6E\">\n                <div class=\"").concat(classes.collapseContentNav, "\">\n                    <label class=\"").concat(classes.embyLabel, "\">\u5355\u6B21\u5B9A\u65F6\u6267\u884C: </label>\n                    <div id=\"").concat(eleIds.timeoutCallbackTypeDiv, "\"></div>\n                    <label class=\"").concat(classes.embyLabel, "\">\u5B9A\u65F6\u5355\u4F4D: </label>\n                    <div id=\"").concat(eleIds.timeoutCallbackUnitDiv, "\"></div>\n                    <div style=\"").concat(styles.embySlider, " margin-top: 0.3em;\">\n                        <label class=\"").concat(classes.embyLabel, "\" style=\"width:4em;\">").concat(lsKeys.timeoutCallbackValue.name, ": </label>\n                        <div id=\"").concat(eleIds.timeoutCallbackDiv, "\" style=\"width: 15.5em; text-align: center;\"></div>\n                        <label id=\"").concat(eleIds.timeoutCallbackLabel, "\" style=\"").concat(styles.embySliderLabel, "\"></label>\n                    </div>\n                </div>\n            </div>\n            <div is=\"emby-collapse\" title=\"Bangumi \u8BBE\u7F6E\">\n                <div class=\"").concat(classes.collapseContentNav, "\" style=\"padding-top: 0.5em !important;\">\n                    <label id=\"").concat(eleIds.bangumiEnableLabel, "\" class=\"").concat(classes.embyLabel, "\"></label>\n                    <div id=\"").concat(eleIds.bangumiSettingsDiv, "\">\n                        <div id=\"").concat(eleIds.bangumiTokenInputDiv, "\" style=\"display: flex;\"></div>\n                        <div id=\"").concat(eleIds.bangumiTokenLabel, "\" class=\"").concat(classes.embyFieldDesc, "\"></div>\n                        <div class=\"").concat(classes.embyFieldDesc, "\">\u4F60\u53EF\u4EE5\u5728\u4EE5\u4E0B\u94FE\u63A5\u751F\u6210\u4E00\u4E2A Access Token</div>\n                        <div id=\"").concat(eleIds.bangumiTokenLinkDiv, "\" style=\"padding-bottom: 0.5em;\"></div>\n                        <label class=\"").concat(classes.embyLabel, "\">\u81EA\u52A8\u66F4\u65B0\u5355\u7AE0\u8282\u6536\u85CF\u4FE1\u606F: </label>\n                        <div style=\"").concat(styles.embySlider, "\">\n                            <label class=\"").concat(classes.embyLabel, "\" style=\"width:4em;\">").concat(lsKeys.bangumiPostPercent.name, ": </label>\n                            <div id=\"").concat(eleIds.bangumiPostPercentDiv, "\" style=\"width: 15.5em; text-align: center;\"></div>\n                            <label><label style=\"").concat(styles.embySliderLabel, "\"></label><label>%</label></label>\n                        </div>\n                        <div class=\"").concat(classes.embyFieldDesc, "\">\n                            \u89E6\u53D1\u65F6\u673A\u4E3A\u6B63\u5E38\u505C\u6B62\u64AD\u653E,\u4E14\u64AD\u653E\u8FDB\u5EA6\u8D85\u8FC7\u8BBE\u5B9A\u767E\u5206\u6BD4\u65F6;\n                            \u540C\u6B65\u7684\u5A92\u4F53\u4FE1\u606F\u4E3A\u81EA\u52A8\u5339\u914D\u800C\u6765,\u53EF\u5728\"\u5F39\u5E55\u4FE1\u606F\"\u4E2D\u67E5\u770B;\n                            \u81EA\u52A8\u5339\u914D\u6709\u8BEF\u53EF\"\u624B\u52A8\u5339\u914D\",\u4ECD\u65E0\u6CD5\u5339\u914D\u53EF\u70B9\u51FB\u6309\u94AEX\"\u53D6\u6D88\u5339\u914D/\u6E05\u9664\u5F39\u5E55\",\u5219\u6B64\u5355\u7AE0\u8282\u4E0D\u4F1A\u540C\u6B65;\n                        </div>\n                    </div>\n                </div>\n            </div>\n            <div is=\"emby-collapse\" title=\"\u81EA\u5B9A\u4E49\u63A5\u53E3\u5730\u5740\">\n                <div id=\"").concat(eleIds.customeUrlsDiv, "\" class=\"").concat(classes.collapseContentNav, "\"></div>\n            </div>\n        </div>\n    ");
+    container.innerHTML = template.trim();
+    buildDanmakuFilterSetting(container);
+    buildExtSetting(container);
+    buildOsdSetting();
+    buildPlaySetting(container);
+    buildBangumiSetting(container);
+    buildCustomUrlSetting(container);
+  }
+
+  function doConsoleLogChange(checked) {
+    lsSetItem(lsKeys.consoleLogEnable.id, checked);
+    var consoleLogInfo = getById(eleIds.consoleLogInfo);
+    if (consoleLogInfo) consoleLogInfo.style.display = checked ? '' : 'none';
+    var consoleLogTextEle = getById(eleIds.consoleLogText);
+    if (checked) {
+      if (!window.ede.appLogAspect) {
+        window.ede.appLogAspect = new AppLogAspect().init();
+      }
+      if (consoleLogTextEle) {
+        consoleLogTextEle.value = window.ede.appLogAspect.value;
+        window.ede.appLogAspect.on(function (newValue) {
+          if (consoleLogTextEle.value.length !== newValue.length) {
+            consoleLogTextEle.value = newValue;
+            consoleLogTextEle.scrollTop = consoleLogTextEle.scrollHeight;
+            var consoleLogCountLabel = getById(eleIds.consoleLogCountLabel);
+            if (consoleLogCountLabel) {
+              consoleLogCountLabel.innerHTML = "\u6E05\u7A7A ".concat(newValue.split('\n').length - 1, " \u884C");
+            }
+          }
+        });
+      }
+    } else {
+      if (consoleLogTextEle) consoleLogTextEle.value = '';
+      if (window.ede.appLogAspect) {
+        window.ede.appLogAspect.destroy();
+        window.ede.appLogAspect = null;
+      }
+    }
+  }
+  function generateRandomDanmu(count, duration) {
+    count = count || 10000;
+    duration = duration || 600;
+    var comments = [];
+    var modes = [1, 4, 5, 6];
+    for (var i = 0; i < count; i++) {
+      var time = parseFloat((Math.random() * duration).toFixed(2));
+      var mode = modes[Math.floor(Math.random() * modes.length)];
+      var color = Math.floor(Math.random() * 16777216);
+      var p = time + ',' + mode + ',' + color + ',0';
+      var cid = 1000000000 + i;
+      comments.push({
+        cid: cid,
+        p: p,
+        m: '这是第' + (i + 1) + '条弹幕'
+      });
+    }
+    return comments;
+  }
+  function buildConsoleLog(container) {
+    var consoleLogEnable = lsGetItem(lsKeys.consoleLogEnable.id);
+    var consoleLogInfo = getById(eleIds.consoleLogInfo, container);
+    if (consoleLogInfo) consoleLogInfo.style.display = consoleLogEnable ? '' : 'none';
+    if (consoleLogEnable) doConsoleLogChange(consoleLogEnable);
+    var consoleLogCtrlEle = getById(eleIds.consoleLogCtrl, container);
+    if (!consoleLogCtrlEle) return;
+    consoleLogCtrlEle.append(embyCheckbox({
+      id: lsKeys.consoleLogEnable.id,
+      name: lsKeys.consoleLogEnable.id,
+      label: lsKeys.consoleLogEnable.name
+    }, consoleLogEnable, doConsoleLogChange));
+    var consoleLogCountLabel = document.createElement('label');
+    consoleLogCountLabel.id = eleIds.consoleLogCountLabel;
+    consoleLogCtrlEle.append(embyButton({
+      label: '清空',
+      iconKey: iconKeys.block
+    }, function () {
+      var textEl = getById(eleIds.consoleLogText, container);
+      if (textEl) textEl.value = '';
+      var countEl = getById(eleIds.consoleLogCountLabel);
+      if (countEl) countEl.innerHTML = '';
+      if (window.ede.appLogAspect) window.ede.appLogAspect.value = '';
+    }), consoleLogCountLabel);
+    var consoleLogTextInput = getById(eleIds.consoleLogTextInput, container);
+    if (consoleLogTextInput) {
+      consoleLogTextInput.style.display = consoleLogEnable && lsGetItem(lsKeys.quickDebugOn.id) ? '' : 'none';
+      consoleLogTextInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          var inputVal = e.target.value.trim();
+          console.log('输入内容为: \n', inputVal);
+          try {
+            eval(inputVal);
+          } catch (err) {
+            console.error(err);
+          }
+          e.target.value = '';
+        }
+      });
+    }
+  }
+  function buildDebugCheckbox(container) {
+    var debugWrapper = getById(eleIds.debugCheckbox, container);
+    if (!debugWrapper) return;
+    debugWrapper.append(embyCheckbox({
+      id: lsKeys.debugShowDanmakuWrapper.id,
+      name: lsKeys.debugShowDanmakuWrapper.id,
+      label: lsKeys.debugShowDanmakuWrapper.name
+    }, lsGetItem(lsKeys.debugShowDanmakuWrapper.id), function (checked) {
+      lsSetItem(lsKeys.debugShowDanmakuWrapper.id, checked);
+      var wrapper = getById(eleIds.danmakuWrapper);
+      if (wrapper) {
+        wrapper.style.backgroundColor = checked ? styles.colors.highlight : '';
+        if (checked) {
+          console.log("\u5F39\u5E55\u5BB9\u5668(#".concat(eleIds.danmakuWrapper, ")\u5BBD\u9AD8\u50CF\u7D20:"), wrapper.offsetWidth, wrapper.offsetHeight);
+          var stage = wrapper.firstChild;
+          if (stage) console.log("\u5B9E\u9645\u821E\u53F0(".concat(stage.tagName, ")\u5BBD\u9AD8\u50CF\u7D20:"), stage.offsetWidth, stage.offsetHeight);
+        }
+      }
+    }));
+    debugWrapper.append(embyCheckbox({
+      id: lsKeys.debugShowDanmakuCtrWrapper.id,
+      name: lsKeys.debugShowDanmakuCtrWrapper.id,
+      label: lsKeys.debugShowDanmakuCtrWrapper.name
+    }, lsGetItem(lsKeys.debugShowDanmakuCtrWrapper.id), function (checked) {
+      lsSetItem(lsKeys.debugShowDanmakuCtrWrapper.id, checked);
+      var wrapper = getById(eleIds.danmakuCtr);
+      if (wrapper) {
+        wrapper.style.backgroundColor = checked ? styles.colors.highlight : '';
+        if (checked) console.log("\u6309\u94AE\u5BB9\u5668(#".concat(eleIds.danmakuCtr, ")\u5BBD\u9AD8\u50CF\u7D20:"), wrapper.offsetWidth, wrapper.offsetHeight);
+      }
+    }));
+    debugWrapper.append(embyCheckbox({
+      id: lsKeys.debugReverseDanmu.id,
+      name: lsKeys.debugReverseDanmu.id,
+      label: lsKeys.debugReverseDanmu.name
+    }, lsGetItem(lsKeys.debugReverseDanmu.id), function (checked) {
+      var _window$ede;
+      lsSetItem(lsKeys.debugReverseDanmu.id, checked);
+      var comments = (_window$ede = window.ede) === null || _window$ede === void 0 ? void 0 : _window$ede.commentsOriginal;
+      if (comments) {
+        var modified = comments.map(function (c) {
+          var values = c.p.split(',');
+          values[1] = {
+            '6': '1',
+            '1': '6',
+            '5': '4',
+            '4': '5'
+          }[values[1]] || values[1];
+          return _objectSpread2(_objectSpread2({}, c), {}, {
+            p: values.join()
+          });
+        });
+        console.log('已' + lsKeys.debugReverseDanmu.name);
+        createDanmaku(modified);
+      }
+    }));
+    var toggleDanmuColor = function toggleDanmuColor(checked, lsKey, colorFn) {
+      var _window$ede2;
+      lsSetItem(lsKey.id, checked);
+      var comments = (_window$ede2 = window.ede) === null || _window$ede2 === void 0 ? void 0 : _window$ede2.commentsOriginal;
+      if (!comments) return;
+      if (checked) {
+        window.ede._oriComments = structuredClone(comments);
+        comments = comments.map(function (c) {
+          var values = c.p.split(',');
+          values[2] = colorFn();
+          return _objectSpread2(_objectSpread2({}, c), {}, {
+            p: values.join()
+          });
+        });
+        console.log('已' + lsKey.name);
+      } else {
+        comments = window.ede._oriComments;
+        window.ede.commentsOriginal = comments;
+        console.log('已还原' + lsKey.name);
+      }
+      createDanmaku(comments);
+    };
+    debugWrapper.append(embyCheckbox({
+      id: lsKeys.debugRandomDanmuColor.id,
+      name: lsKeys.debugRandomDanmuColor.id,
+      label: lsKeys.debugRandomDanmuColor.name
+    }, lsGetItem(lsKeys.debugRandomDanmuColor.id), function (checked) {
+      return toggleDanmuColor(checked, lsKeys.debugRandomDanmuColor, function () {
+        return parseInt(Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'), 16);
+      });
+    }));
+    debugWrapper.append(embyCheckbox({
+      id: lsKeys.debugForceDanmuWhite.id,
+      name: lsKeys.debugForceDanmuWhite.id,
+      label: lsKeys.debugForceDanmuWhite.name
+    }, lsGetItem(lsKeys.debugForceDanmuWhite.id), function (checked) {
+      return toggleDanmuColor(checked, lsKeys.debugForceDanmuWhite, function () {
+        return parseInt(styles.colors.info.toString(16).padStart(6, '0'), 16);
+      });
+    }));
+    var toggleTopBottomToScroll = function toggleTopBottomToScroll(checked, lsKey) {
+      var _window$ede3;
+      lsSetItem(lsKey.id, checked);
+      var comments = (_window$ede3 = window.ede) === null || _window$ede3 === void 0 ? void 0 : _window$ede3.commentsOriginal;
+      if (!comments) return;
+      if (checked) {
+        window.ede._oriComments = structuredClone(comments);
+        comments = comments.map(function (c) {
+          var values = c.p.split(',');
+          if (values[1] === '4' || values[1] === '5') values[1] = '1';
+          return _objectSpread2(_objectSpread2({}, c), {}, {
+            p: values.join()
+          });
+        });
+        console.log('已' + lsKey.name);
+      } else {
+        comments = window.ede._oriComments;
+        window.ede.commentsOriginal = comments;
+        console.log('已还原' + lsKey.name);
+      }
+      createDanmaku(comments);
+    };
+    debugWrapper.append(embyCheckbox({
+      id: lsKeys.debugTopBottomToScroll.id,
+      name: lsKeys.debugTopBottomToScroll.id,
+      label: lsKeys.debugTopBottomToScroll.name
+    }, lsGetItem(lsKeys.debugTopBottomToScroll.id), function (checked) {
+      return toggleTopBottomToScroll(checked, lsKeys.debugTopBottomToScroll);
+    }));
+    var dialogContainer = document.querySelector('.' + classes.dialogContainer);
+    var centeredDialog = dialogContainer === null || dialogContainer === void 0 ? void 0 : dialogContainer.firstChild;
+    if (dialogContainer && centeredDialog) {
+      var isExist1 = dialogContainer.classList.contains(classes.dialogBackdropOpened);
+      var isExist2 = centeredDialog.classList.contains(classes.dialogBlur);
+      var debugDialogHyalinizeOnChange = function debugDialogHyalinizeOnChange(checked) {
+        lsSetItem(lsKeys.debugDialogHyalinize.id, checked);
+        if (checked) {
+          centeredDialog.classList.remove(classes.dialog);
+          if (isExist1) dialogContainer.classList.remove(classes.dialogBackdropOpened);
+          if (isExist2) centeredDialog.classList.remove(classes.dialogBlur);
+        } else {
+          centeredDialog.classList.add(classes.dialog);
+          if (isExist1) dialogContainer.classList.add(classes.dialogBackdropOpened);
+          if (isExist2) centeredDialog.classList.add(classes.dialogBlur);
+        }
+      };
+      debugDialogHyalinizeOnChange(lsGetItem(lsKeys.debugDialogHyalinize.id));
+      debugWrapper.append(embyCheckbox({
+        id: lsKeys.debugDialogHyalinize.id,
+        name: lsKeys.debugDialogHyalinize.id,
+        label: lsKeys.debugDialogHyalinize.name
+      }, lsGetItem(lsKeys.debugDialogHyalinize.id), debugDialogHyalinizeOnChange));
+      var isExist3 = centeredDialog.classList.contains(classes.dialogFullscreen);
+      var isExist4 = centeredDialog.classList.contains(classes.dialogFullscreenLowres);
+      var debugDialogWindowOnChange = function debugDialogWindowOnChange(checked) {
+        lsSetItem(lsKeys.debugDialogWindow.id, checked);
+        if (isExist3) centeredDialog.classList.toggle(classes.dialogFullscreen, !checked);
+        if (isExist4) centeredDialog.classList.toggle(classes.dialogFullscreenLowres, !checked);
+      };
+      debugDialogWindowOnChange(lsGetItem(lsKeys.debugDialogWindow.id));
+      debugWrapper.append(embyCheckbox({
+        id: lsKeys.debugDialogWindow.id,
+        name: lsKeys.debugDialogWindow.id,
+        label: lsKeys.debugDialogWindow.name
+      }, lsGetItem(lsKeys.debugDialogWindow.id), debugDialogWindowOnChange));
+      var debugDialogRightOnChange = function debugDialogRightOnChange(checked) {
+        lsSetItem(lsKeys.debugDialogRight.id, checked);
+        dialogContainer.classList.toggle(classes.dialogBackdropOpened, !checked);
+        centeredDialog.style = checked ? styles.rightLayout : '';
+        if (checked) {
+          if (isExist3) centeredDialog.classList.remove(classes.dialogFullscreen);
+          if (isExist4) centeredDialog.classList.remove(classes.dialogFullscreenLowres);
+        }
+      };
+      debugDialogRightOnChange(lsGetItem(lsKeys.debugDialogRight.id));
+      debugWrapper.append(embyCheckbox({
+        id: lsKeys.debugDialogRight.id,
+        name: lsKeys.debugDialogRight.id,
+        label: lsKeys.debugDialogRight.name
+      }, lsGetItem(lsKeys.debugDialogRight.id), debugDialogRightOnChange));
+    }
+    if (lsGetItem(lsKeys.quickDebugOn.id)) {
+      var tabIframeBtn = getById(tabIframeId + 'Btn');
+      if (tabIframeBtn) {
+        debugWrapper.append(embyCheckbox({
+          id: lsKeys.debugTabIframeEnable.id,
+          name: lsKeys.debugTabIframeEnable.id,
+          label: lsKeys.debugTabIframeEnable.name
+        }, false, function (checked) {
+          tabIframeBtn.style.display = checked ? '' : 'none';
+        }));
+      }
+    }
+    var h5VideoAdapter = getById(eleIds.h5VideoAdapter);
+    if (h5VideoAdapter) {
+      debugWrapper.append(embyCheckbox({
+        id: lsKeys.debugH5VideoAdapterEnable.id,
+        name: lsKeys.debugH5VideoAdapterEnable.id,
+        label: lsKeys.debugH5VideoAdapterEnable.name
+      }, lsGetItem(lsKeys.debugH5VideoAdapterEnable.id), function (checked) {
+        lsSetItem(lsKeys.debugH5VideoAdapterEnable.id, checked);
+        h5VideoAdapter.style.display = checked ? '' : 'none';
+        h5VideoAdapter.style.backgroundColor = checked ? styles.colors.highlight : '';
+      }));
+    }
+    if (lsGetItem(lsKeys.quickDebugOn.id)) {
+      debugWrapper.append(embyCheckbox({
+        id: lsKeys.debugDanmuAnywhereEnable.id,
+        name: lsKeys.debugDanmuAnywhereEnable.id,
+        label: lsKeys.debugDanmuAnywhereEnable.name
+      }, false, function (checked) {
+        if (checked) {
+          var bodyEle = document.body;
+          var media = document.createElement('video');
+          media.id = 'test-media';
+          var containerEle = document.createElement('div');
+          containerEle.id = 'test-media-container';
+          containerEle.className = mediaContainerQueryStr.replace('.', '');
+          containerEle.style.position = 'fixed';
+          containerEle.style.zIndex = '255';
+          containerEle.prepend(media);
+          bodyEle.prepend(containerEle);
+          media.play();
+          setInterval(function () {
+            media.currentTime += 100 / 1e3;
+            media.dispatchEvent(new Event('timeupdate'));
+          }, 100);
+          createDanmaku(generateRandomDanmu(50000, 600)).then(function () {
+            return console.log('弹幕就位');
+          }).catch(function (err) {
+            return console.log(err);
+          });
+        } else {
+          var _window$ede4, _getById;
+          if ((_window$ede4 = window.ede) !== null && _window$ede4 !== void 0 && _window$ede4.danmaku) {
+            window.ede.danmaku.destroy();
+            window.ede.danmaku = null;
+          }
+          (_getById = getById('test-media-container')) === null || _getById === void 0 || _getById.remove();
+        }
+      }));
+    }
+  }
+  function buildDebugButton(container) {
+    var debugWrapper = getById(eleIds.debugButton, container);
+    if (!debugWrapper) return;
+    debugWrapper.append(embyButton({
+      label: '打印环境信息',
+      style: 'margin: 0.3em;'
+    }, function () {
+      if (typeof require === 'function') {
+        require(['browser'], function (browser) {
+          return console.log('Emby 内部自身判断: ', browser);
+        });
+      }
+      if (typeof ApiClient !== 'undefined') {
+        console.log('Emby appName: ', ApiClient.appName());
+        console.log('Emby appVersion: ', ApiClient.appVersion());
+      }
+    }));
+    debugWrapper.append(embyButton({
+      label: '打印弹幕引擎信息',
+      style: 'margin: 0.3em;'
+    }, function () {
+      var _window$ede5;
+      var msg = "\u5F39\u5E55\u5F15\u64CE\u662F\u5426\u5B58\u5728: ".concat(!!window.Danmaku, ", \u5F39\u5E55\u5F15\u64CE\u662F\u5426\u5B9E\u4F8B\u5316\u6210\u529F: ").concat(!!((_window$ede5 = window.ede) !== null && _window$ede5 !== void 0 && _window$ede5.danmaku));
+      console.log(msg);
+      embyToast({
+        text: msg
+      });
+    }));
+    debugWrapper.append(embyButton({
+      label: '打印视频加载方',
+      style: 'margin: 0.3em;'
+    }, function () {
+      var _media = document.querySelector(mediaContainerQueryStr);
+      if (!_media) return console.error('严重错误,页面中依旧不存在 <video> 标签');
+      if (_media.currentTime < 1) return console.error('严重错误,<video> 的 currentTime < 1');
+      if (!_media.id) {
+        var _media$parentNode;
+        console.log('视频加载方为 Web 端 <video> 标签:', (_media$parentNode = _media.parentNode) === null || _media$parentNode === void 0 ? void 0 : _media$parentNode.outerHTML);
+      } else {
+        console.log('当前 <video> 标签为虚拟适配器:', _media.outerHTML);
+        var _embed = document.querySelector('embed');
+        if (_embed) {
+          var _embed$parentNode;
+          console.log('视频加载方为 <embed> 标签占位的 Native 播放器:', (_embed$parentNode = _embed.parentNode) === null || _embed$parentNode === void 0 ? void 0 : _embed$parentNode.outerHTML);
+        } else {
+          console.log('视频加载方为无占位标签的 Native 播放器,无信息');
+        }
+      }
+    }));
+    debugWrapper.append(embyButton({
+      label: '重置设置',
+      class: classes.embyButtons.submit,
+      style: 'margin: 0.3em;'
+    }, function () {
+      settingsReset(lsKeys, lsBatchSet);
+      console.log("\u5DF2\u91CD\u7F6E\u8BBE\u7F6E, \u8DF3\u8FC7\u4E86 ".concat(lsKeys.filterKeywords.name, " \u91CD\u7F6E"));
+      embyToast({
+        text: "\u5DF2\u91CD\u7F6E\u8BBE\u7F6E, \u8DF3\u8FC7\u4E86 ".concat(lsKeys.filterKeywords.name, " \u91CD\u7F6E")
+      });
+      loadDanmaku(LOAD_TYPE.INIT);
+      closeEmbyDialog();
+    }));
+  }
+  function buildOpenSourceLicense(container) {
+    var openSourceWrapper = getById(eleIds.openSourceLicenseDiv, container);
+    if (!openSourceWrapper) return;
+    objectEntries(openSourceLicense).forEach(function (_ref) {
+      var _ref2 = _slicedToArray(_ref, 2),
+        key = _ref2[0],
+        val = _ref2[1];
+      openSourceWrapper.append(embyALink(val.url, [key, val.name, val.version, val.license].join(' : ')));
+    });
   }
 
   /**
@@ -3878,13 +5874,12 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
   function buildAbout(containerId) {
     var container = getById(containerId);
     if (!container) return;
-    var licenseHtml = Object.entries(openSourceLicense).map(function (_ref) {
-      var _ref2 = _slicedToArray(_ref, 2);
-        _ref2[0];
-        var val = _ref2[1];
-      return "<div><a href=\"".concat(val.url, "\" target=\"_blank\">").concat(val.name, "</a> v").concat(val.version, " (").concat(val.license, ")</div>");
-    }).join('');
-    container.innerHTML = "\n        <div style=\"height: 30em;\">\n            <div id=\"".concat(eleIds.openSourceLicenseDiv, "\">\n                <h4>\u5F00\u6E90\u534F\u8BAE</h4>\n                ").concat(licenseHtml, "\n            </div>\n        </div>\n    ");
+    var template = "\n        <div style=\"height: 30em;\">\n            <div id=\"".concat(eleIds.consoleLogCtrl, "\"></div>\n            <div id=\"").concat(eleIds.consoleLogInfo, "\">\n                <textarea id=\"").concat(eleIds.consoleLogText, "\" readOnly style=\"resize: vertical;margin-top: 0.6em;\"\n                    rows=\"12\" is=\"emby-textarea\" class=\"txtOverview emby-textarea\"></textarea>\n                <textarea id=\"").concat(eleIds.consoleLogTextInput, "\" hidden style=\"resize: vertical;\"\n                    rows=\"1\" is=\"emby-textarea\" class=\"txtOverview emby-textarea\"></textarea>\n            </div>\n            <div class=\"").concat(classes.embyFieldDesc, "\">\u6CE8\u610F\u5F00\u542F\u540E\u539F\u672C\u63A7\u5236\u53F0\u4E2D\u8C03\u7528\u65B9\u4FE1\u606F\u5C06\u88AB\u8986\u76D6,\u4E0D\u4F7F\u7528\u8BF7\u4FDD\u6301\u5173\u95ED\u72B6\u6001</div>\n            <div is=\"emby-collapse\" title=\"\u5F00\u53D1\u8005\u9009\u9879\">\n                <div class=\"").concat(classes.collapseContentNav, "\">\n                    <label class=\"").concat(classes.embyLabel, "\">\u8C03\u8BD5\u5F00\u5173: </label>\n                    <div id=\"").concat(eleIds.debugCheckbox, "\" class=\"").concat(classes.embyCheckboxList, "\" style=\"").concat(styles.embyCheckboxList, "\"></div>\n                    <label class=\"").concat(classes.embyLabel, "\">\u8C03\u8BD5\u6309\u94AE: </label>\n                    <div id=\"").concat(eleIds.debugButton, "\"></div>\n                </div>\n            </div>\n            <div is=\"emby-collapse\" title=\"\u5F00\u653E\u6E90\u4EE3\u7801\u8BB8\u53EF\" data-expanded=\"true\" style=\"margin-top: 0.6em;\">\n                <div id=\"").concat(eleIds.openSourceLicenseDiv, "\" class=\"").concat(classes.collapseContentNav, "\" style=\"display: flex; flex-direction: column;\"></div>\n            </div>\n        </div>\n    ");
+    container.innerHTML = template.trim();
+    buildConsoleLog(container);
+    buildDebugCheckbox(container);
+    buildDebugButton(container);
+    buildOpenSourceLicense(container);
   }
 
   /**
@@ -3944,6 +5939,16 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
       });
     }
     return Promise.reject(new Error('Emby require not available'));
+  }
+
+  /**
+   * 关闭当前弹窗
+   */
+  function closeEmbyDialog() {
+    var footerItem = getByClass(classes.formDialogFooterItem);
+    if (footerItem) {
+      footerItem.dispatchEvent(new Event('click'));
+    }
   }
 
   /**
@@ -4163,22 +6168,6 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
   }
 
   /**
-   * 自定义 URL 配置（从 localStorage 应用用户设置）
-   */
-  var customeUrl = {
-    init: function init() {
-      var danmakuUrl = lsGetItem(lsKeys.customeDanmakuUrl.id);
-      if (danmakuUrl && setRequireDanmakuPath) {
-        setRequireDanmakuPath(danmakuUrl);
-      }
-      var corsUrl = lsGetItem(lsKeys.customeCorsProxyUrl.id);
-      if (corsUrl && setCorsProxy) {
-        setCorsProxy(corsUrl);
-      }
-    }
-  };
-
-  /**
    * 彩蛋与调试
    */
   function toggleSettingBtn2Header() {
@@ -4249,85 +6238,6 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
           target.setAttribute('endFlag', '1');
         }
       });
-    }
-  }
-
-  /**
-   * 播放 OSD 显示/隐藏事件
-   */
-
-  /**
-   * 播放界面右下角显示弹幕信息（弹幕：xxx条 / 未匹配）
-   * 从 ede.js 4116-4140 行迁移
-   * @param {number} [loadSum] - 已加载弹幕数量，不传时从 window.ede 计算
-   */
-  function appendvideoOsdDanmakuInfo(loadSum) {
-    var _window$ede;
-    if (!lsGetItem(lsKeys.osdTitleEnable.id)) return;
-    var episode_info = ((_window$ede = window.ede) === null || _window$ede === void 0 ? void 0 : _window$ede.episode_info) || {};
-    var episodeId = episode_info.episodeId,
-      animeTitle = episode_info.animeTitle,
-      episodeTitle = episode_info.episodeTitle;
-    var videoOsdContainer = document.querySelector("".concat(mediaContainerQueryStr, " .videoOsdSecondaryText"));
-    var videoOsdDanmakuTitle = getById(eleIds.videoOsdDanmakuTitle, videoOsdContainer);
-    if (!videoOsdDanmakuTitle) {
-      videoOsdDanmakuTitle = document.createElement('h3');
-      videoOsdDanmakuTitle.id = eleIds.videoOsdDanmakuTitle;
-      videoOsdDanmakuTitle.classList.add(classes.videoOsdTitle);
-      videoOsdDanmakuTitle.style.cssText = 'margin-left: auto; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; position: absolute; right: 0px; bottom: 0px;';
-    }
-    var text = '弹幕：';
-    if (episodeId) {
-      var count = loadSum !== null && loadSum !== void 0 ? loadSum : window.ede ? getDanmakuComments(window.ede).length : 0;
-      text += "".concat(animeTitle, " - ").concat(episodeTitle, " - ").concat(count, "\u6761");
-    } else {
-      text += '未匹配';
-    }
-    videoOsdDanmakuTitle.innerText = text;
-    if (videoOsdContainer) {
-      videoOsdContainer.append(videoOsdDanmakuTitle);
-    }
-  }
-  function addHeaderClock() {
-    var _window$ede2;
-    var warpper = getByClass('headerMiddle');
-    var headerClockEle = getById('headerClock');
-    if (!warpper) return;
-    if (headerClockEle) headerClockEle.remove();
-    var clockElement = document.createElement('div');
-    clockElement.id = 'headerClock';
-    warpper.append(clockElement);
-    function updateClock() {
-      clockElement.textContent = new Date().toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      });
-    }
-    updateClock();
-    var intervalId = setInterval(updateClock, 1000);
-    if ((_window$ede2 = window.ede) !== null && _window$ede2 !== void 0 && _window$ede2.destroyIntervalIds) {
-      window.ede.destroyIntervalIds.push(intervalId);
-    }
-  }
-  function removeHeaderClock() {
-    var headerClockEle = getById('headerClock');
-    if (headerClockEle) headerClockEle.remove();
-    destroyAllInterval();
-  }
-  function onVideoOsdShow(e) {
-    console.log(e === null || e === void 0 ? void 0 : e.type, e);
-    if (lsGetItem(lsKeys.osdLineChartEnable.id)) {
-      buildProgressBarChart(20);
-    }
-    if (lsGetItem(lsKeys.osdHeaderClockEnable.id)) {
-      addHeaderClock();
-    }
-  }
-  function onVideoOsdHide(e) {
-    console.log(e === null || e === void 0 ? void 0 : e.type, e);
-    if (lsGetItem(lsKeys.osdHeaderClockEnable.id)) {
-      removeHeaderClock();
     }
   }
 

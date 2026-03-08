@@ -120,6 +120,8 @@
 - ui/tabs（setting、search、info、pro、about）、ui/init.js
 - match/emby-item.js（getMapByEmbyItemInfo）
 
+**补全记录（2025-03-08）**：setting.js、search.js、pro.js、about.js 占位实现已全部补全为完整实现
+
 ---
 
 ## 阶段 5：事件与入口整合

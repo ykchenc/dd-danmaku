@@ -19,6 +19,6 @@ export {
 } from './fallback.js';
 export { calculateFileHash, tryMatchByHash } from './hash.js';
 export { filterMainEpisodes, tryMatchByTmdbId } from './tmdb.js';
-export { parseAnimeName, lsSeasonSearchEpisodes, searchEpisodes } from './episode.js';
+export { parseAnimeName, lsSeasonSearchEpisodes, searchEpisodes, writeLsSeasonInfo } from './episode.js';
 export { getEpisodeInfo } from './get-episode-info.js';
 export { getMapByEmbyItemInfo } from './emby-item.js';
