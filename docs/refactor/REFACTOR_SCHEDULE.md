@@ -4,6 +4,8 @@
 > 创建日期：2025-03-08  
 > 状态：待执行
 
+> **注意**：改造过程中**请勿修改原有实现逻辑**，仅做代码迁移与模块拆分，不改变业务行为。
+
 ---
 
 ## 总览
@@ -38,12 +40,13 @@
 | 序号 | 任务 | 说明 | 产出 |
 |------|------|------|------|
 | 1.1 | 抽取 config/constants.js | check_interval、LOAD_TYPE、mediaQueryStr、mediaContainerQueryStr、notHide 等 | constants.js |
-| 1.2 | 抽取 config/ls-keys.js | lsKeys、lsLocalKeys 完整定义 | ls-keys.js |
-| 1.3 | 抽取 config/ele-ids.js | eleIds 完整定义 | ele-ids.js |
-| 1.4 | 抽取 config/icons.js | iconKeys、classes、styles、timeOffsetBtns、danmakuEngineOpts 等 | icons.js |
-| 1.5 | 抽取 config/options.js | danmakuTabOpts、danmakuTypeFilterOpts、danmakuSource、danmuListOpts、apiPriorityOpts 等 | options.js |
-| 1.6 | 抽取 config/api.js | openSourceLicense、dandanplayApi、dandanplayApiCustom、bangumiApi（注意 prefix getter 与 lsGetItem 的循环依赖） | api.js |
-| 1.7 | 抽取 user-config.js | requireDanmakuPath、corsProxy 及用户可修改配置 | user-config.js |
+| 1.2 | 抽取 config/ele-ids.js | eleIds 完整定义（聚合成独立文件） | ele-ids.js |
+| 1.3 | 抽取 config/ls-keys.js | lsKeys 完整定义（聚合成独立文件） | ls-keys.js |
+| 1.4 | 抽取 config/ls-local-keys.js | lsLocalKeys 完整定义（聚合成独立文件） | ls-local-keys.js |
+| 1.5 | 抽取 config/icons.js | iconKeys、classes、styles、timeOffsetBtns、danmakuEngineOpts 等 | icons.js |
+| 1.6 | 抽取 config/options.js | danmakuTabOpts、danmakuTypeFilterOpts、danmakuSource、danmuListOpts、apiPriorityOpts 等 | options.js |
+| 1.7 | 抽取 config/api.js | openSourceLicense、dandanplayApi、dandanplayApiCustom、bangumiApi（注意 prefix getter 与 lsGetItem 的循环依赖） | api.js |
+| 1.8 | 抽取 user-config.js | requireDanmakuPath、corsProxy 及用户可修改配置 | user-config.js |
 
 **验收**：各 config 模块可独立 import，无循环依赖
 
@@ -138,6 +141,22 @@
 
 ---
 
+## 计划细化建议
+
+当前计划粒度已足够支撑执行，**建议先按现有编排推进**，在阶段 1 完成后再视情况补充：
+
+| 可细化项 | 当前状态 | 建议 |
+|----------|----------|------|
+| 任务拆解 | 每阶段 4–13 个子任务 | 足够，执行时可按任务拆 PR |
+| 代码映射 | 未提供 ede.js 行号→模块映射 | 阶段 1 执行时可补充 `docs/refactor/CODE_MAPPING.md`，便于迁移时定位 |
+| 循环依赖处理 | 计划中已标注 api.js 注意点 | 阶段 1.7 执行时细化 dandanplayApi.prefix 的注入方案 |
+| 验收用例 | 仅阶段级验收描述 | 阶段 6 执行时补充具体测试用例清单 |
+| 回滚策略 | 未涉及 | 每阶段完成后打 tag（如 `modular-phase-1`），便于回滚 |
+
+**结论**：无需在开工前进一步细化，按阶段执行即可；若某阶段卡住，再针对该阶段补充子计划。
+
+---
+
 ## 执行建议
 
 1. **按阶段推进**：每阶段完成后做一次小范围验证，避免问题累积
@@ -152,3 +171,4 @@
 | 日期 | 变更内容 |
 |------|----------|
 | 2025-03-08 | 初版创建 |
+| 2025-03-08 | 明确 eleIds、lsKeys、lsLocalKeys 聚合成 3 个独立 config 文件；新增计划细化建议 |

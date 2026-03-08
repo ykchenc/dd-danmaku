@@ -9,6 +9,8 @@
 ## 一、改造目标
 
 1. **可维护性**：将 5000+ 行单文件拆分为职责清晰的模块，便于阅读与修改
+
+> **注意**：改造过程中**请勿修改原有实现逻辑**，仅做代码迁移与模块拆分，不改变业务行为。
 2. **可扩展性**：模块边界清晰，便于后续功能扩展与独立测试
 3. **兼容性**：构建产物保持与现有加载方式一致（油猴、index.html、CustomCssJS）
 4. **构建流程**：引入 Rollup 作为打包工具，输出 IIFE 格式单文件
@@ -23,8 +25,9 @@ dd-danmaku/
 │   ├── index.js                 # 入口：初始化、事件绑定、IIFE 包装
 │   ├── config/
 │   │   ├── constants.js         # 常量：check_interval、LOAD_TYPE、mediaQueryStr
-│   │   ├── ls-keys.js           # lsKeys、lsLocalKeys 配置
-│   │   ├── ele-ids.js           # eleIds 元素 ID 集合
+│   │   ├── ele-ids.js           # eleIds 元素 ID 集合（聚合成独立文件）
+│   │   ├── ls-keys.js           # lsKeys localStorage 配置键（聚合成独立文件）
+│   │   ├── ls-local-keys.js      # lsLocalKeys localStorage 前缀键（聚合成独立文件）
 │   │   ├── icons.js             # iconKeys、classes、styles
 │   │   ├── options.js           # danmakuTabOpts、danmakuTypeFilterOpts、danmakuSource 等
 │   │   └── api.js               # dandanplayApi、bangumiApi、openSourceLicense
@@ -88,13 +91,25 @@ dd-danmaku/
         └── REFACTOR_SCHEDULE.md # 计划编排
 ```
 
+### 2.1 设计决策：config 聚合方式
+
+**eleIds、lsKeys、lsLocalKeys** 采用聚合成 3 个独立 config 文件的方案：
+
+| 文件 | 内容 | 说明 |
+|------|------|------|
+| `ele-ids.js` | eleIds | DOM 元素 ID 集合，约 60+ 项 |
+| `ls-keys.js` | lsKeys | localStorage 配置键（含 defaultValue、min、max 等），约 50+ 项 |
+| `ls-local-keys.js` | lsLocalKeys | localStorage 前缀键（animePrefix、apiPrefix 等），约 6 项 |
+
+**原因**：单一数据源、维护集中、避免散落导致的不一致，各使用方通过 `import` 按需引用。
+
 ---
 
 ## 三、模块依赖关系
 
 ```
 index.js
-  ├── config/* (constants, ls-keys, ele-ids, icons, options, api)
+  ├── config/* (constants, ele-ids, ls-keys, ls-local-keys, icons, options, api)
   ├── core/* (EDE, AppLogAspect, storage)
   ├── match/* (search, tmdb, hash, fallback, similarity, episode)
   ├── danmaku/* (loader, filter, parser, chart, toast)
@@ -105,7 +120,7 @@ index.js
   └── vendor/danmaku-inline
 
 依赖层级（自底向上）：
-  L0: config, utils, vendor
+  L0: config (constants, ele-ids, ls-keys, ls-local-keys, icons, options, api), utils, vendor
   L1: core/storage (依赖 config)
   L2: core/EDE, core/AppLogAspect
   L3: match/*, danmaku/*, bangumi/*
