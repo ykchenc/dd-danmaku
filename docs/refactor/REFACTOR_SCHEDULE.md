@@ -2,7 +2,7 @@
 
 > 分支：`feature/modular-refactor`  
 > 创建日期：2025-03-08  
-> 状态：阶段 4 部分完成（4.1–4.4 已完成，4.5–4.6 待补充）
+> 状态：阶段 4 已完成
 
 > **注意**：改造过程中**请勿修改原有实现逻辑**，仅做代码迁移与模块拆分，不改变业务行为。
 
@@ -112,10 +112,11 @@
 
 **验收**：UI 模块可正确渲染各 Tab，无样式与事件丢失
 
-**阶段 4 完成情况**：
-- 4.1–4.2 已完成：bangumi/api.js、bangumi/characters.js
-- 4.3–4.4 已完成：ui/components（common、inputs、buttons、layout）、ui/dialog.js
-- 4.5–4.6 待补充：ui/tabs（setting、search、info、pro、about）、ui/init.js
+**阶段 4 完成情况**：已完成 4.1–4.13
+- bangumi/api.js、bangumi/characters.js
+- ui/components（common、inputs、buttons、layout）、ui/dialog.js
+- ui/tabs（setting、search、info、pro、about）、ui/init.js
+- match/emby-item.js（getMapByEmbyItemInfo）
 
 ---
 
@@ -183,3 +184,4 @@
 | 2025-03-08 | 明确 eleIds、lsKeys、lsLocalKeys 聚合成 3 个独立 config 文件；新增计划细化建议 |
 | 2025-03-08 | 阶段 2 完成：core/storage、utils（dom/fetch/platform/helpers）、core/EDE、core/AppLogAspect |
 | 2025-03-08 | 阶段 4 部分完成：bangumi/api、bangumi/characters、ui/components、ui/dialog；helpers 补充 getValueOrInvoke、getSettingsJson、settingsReset |
+| 2025-03-08 | 阶段 4 完成：ui/tabs（setting、search、info、pro、about）、ui/init.js、match/emby-item.js、dialog 集成 afterEmbyDialogCreated |

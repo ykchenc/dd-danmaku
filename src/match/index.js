@@ -20,3 +20,4 @@ export {
 export { calculateFileHash, tryMatchByHash } from './hash.js';
 export { filterMainEpisodes, tryMatchByTmdbId } from './tmdb.js';
 export { parseAnimeName, lsSeasonSearchEpisodes, searchEpisodes } from './episode.js';
+export { getMapByEmbyItemInfo } from './emby-item.js';

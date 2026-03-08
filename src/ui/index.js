@@ -10,3 +10,4 @@ export {
     embyAlert,
     embyToast,
 } from './dialog.js';
+export { initUI, initListener, initCss } from './init.js';

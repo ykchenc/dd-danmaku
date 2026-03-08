@@ -19,7 +19,7 @@ import {
     embyTabs,
     embySlider,
 } from './ui/components/index.js';
-import { createDialog, embyDialog, closeEmbyDialog, embyAlert, embyToast } from './ui/index.js';
+import { createDialog, embyDialog, closeEmbyDialog, embyAlert, embyToast, initUI, initListener, initCss } from './ui/index.js';
 
 (async function () {
     'use strict';
@@ -34,6 +34,6 @@ import { createDialog, embyDialog, closeEmbyDialog, embyAlert, embyToast } from 
         match: { searchEpisodes, fetchSearchEpisodes },
         danmaku: { createDanmaku, danmakuFilter, danmakuParser, toastByDanmaku },
         bangumi: { getEpisodeBangumiRel, putBangumiEpStatus, renderBangumiCharacters, fetchBangumiApiGetMe },
-        ui: { embyButton, embyImg, embyImgButton, embyTabs, embySlider, createDialog, embyDialog, closeEmbyDialog, embyAlert, embyToast },
+        ui: { embyButton, embyImg, embyImgButton, embyTabs, embySlider, createDialog, embyDialog, closeEmbyDialog, embyAlert, embyToast, initUI, initListener, initCss },
     });
 })();
