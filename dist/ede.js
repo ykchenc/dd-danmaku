@@ -373,6 +373,28 @@
         return "https://img.dandanplay.net/anime/".concat(animeId, ".jpg");
       }
     };
+    var bangumiApi = {
+      prefix: 'https://api.bgm.tv/v0',
+      accessTokenUrl: 'https://next.bgm.tv/demo/access-token',
+      getCharacters: function getCharacters(subjectId) {
+        return "".concat(bangumiApi.prefix, "/subjects/").concat(subjectId, "/characters");
+      },
+      getMe: function getMe() {
+        return "".concat(bangumiApi.prefix, "/me");
+      },
+      getUserCollection: function getUserCollection(userName, subjectId) {
+        return "".concat(bangumiApi.prefix, "/users/").concat(userName, "/collections/").concat(subjectId);
+      },
+      postUserCollection: function postUserCollection(subjectId) {
+        return "".concat(bangumiApi.prefix, "/users/-/collections/").concat(subjectId);
+      },
+      getUserSubjectEpisodeCollection: function getUserSubjectEpisodeCollection(subjectId) {
+        return "".concat(bangumiApi.prefix, "/users/-/collections/").concat(subjectId, "/episodes?offset=0&limit=100");
+      },
+      putUserEpisodeCollection: function putUserEpisodeCollection(episodeId) {
+        return "".concat(bangumiApi.prefix, "/users/-/collections/-/episodes/").concat(episodeId);
+      }
+    };
 
     // lsKeys 需在 dandanplayApi 之后，因 defaultValue 使用 getApiTl(dandanplayApi.getComment)
     var lsKeys = {
@@ -760,6 +782,17 @@
         });
       }
       return [];
+    }
+
+    /**
+     * 获取选项的值或执行函数
+     * @param {object} option - 选项对象
+     * @param {string|function} keyOrFunc - 键名或取值函数
+     * @param {number} [index] - 可选索引
+     * @returns {any}
+     */
+    function getValueOrInvoke(option, keyOrFunc, index) {
+      return typeof keyOrFunc === 'function' ? keyOrFunc(option, index) : option[keyOrFunc];
     }
 
     function lsSetItem(id, value) {
@@ -1839,6 +1872,37 @@
      * 从 ede.js 迁移，未修改原有实现逻辑
      */
 
+    // https://fonts.google.com/icons
+    var iconKeys = {
+      replay_30: 'replay_30',
+      replay_10: 'replay_10',
+      replay_5: 'replay_5',
+      replay: 'replay',
+      reset: 'repeat',
+      forward_media: 'forward_media',
+      // electron 中图标不正确,使用 replay 反转
+      forward_5: 'forward_5',
+      forward_10: 'forward_10',
+      forward_30: 'forward_30',
+      comment: 'comment',
+      comments_disabled: 'comments_disabled',
+      switch_on: 'toggle_on',
+      switch_off: 'toggle_off',
+      setting: 'tune',
+      search: 'search',
+      done: 'done_all',
+      done_disabled: 'remove_done',
+      more: 'more_horiz',
+      close: 'close',
+      refresh: 'refresh',
+      block: 'block',
+      text_format: 'translate',
+      person: 'person',
+      sentiment_very_satisfied: 'sentiment_very_satisfied',
+      check: 'check',
+      edit: 'edit'
+    };
+
     // emby ui class
     var classes = {
       dialogContainer: 'dialogContainer',
@@ -2455,8 +2519,523 @@
     }
 
     /**
+     * Bangumi API 相关
+     * 从 ede.js 迁移，未修改原有实现逻辑
+     */
+
+    /**
+     * 修正 Bangumi 集数索引（番剧非第一季时）
+     * @param {number} currentBgmEpisodeIndex
+     * @param {object} danDanPlayBangumi
+     * @returns {number}
+     */
+    function offsetBgmEpisodeIndex(currentBgmEpisodeIndex, danDanPlayBangumi) {
+      if (!danDanPlayBangumi) {
+        return currentBgmEpisodeIndex;
+      }
+      var bangumiEp = danDanPlayBangumi.episodes[currentBgmEpisodeIndex];
+      if (!bangumiEp) {
+        console.log("\u672A\u5339\u914D\u5230 danDanPlayBangumi \u756A\u5267\u96C6\u6570,\u5267\u96C6\u4E0D\u4E3A\u7B2C\u4E00\u5B63,\u5C1D\u8BD5\u5207\u6362\u63A5\u53E3\u6570\u636E\u5339\u914D\u8FD4\u56DE\u4FEE\u6B63\u540E\u7684 bgmEpisodeIndex");
+        return danDanPlayBangumi.episodes.findIndex(function (ep) {
+          return ep.episodeNumber == currentBgmEpisodeIndex + 1;
+        });
+      } else {
+        return currentBgmEpisodeIndex;
+      }
+    }
+
+    /**
+     * 获取当前集对应的 Bangumi 关联信息
+     * @returns {Promise<object>}
+     */
+    async function getEpisodeBangumiRel() {
+      var episode_info = window.ede.episode_info;
+      var _bangumi_key = lsLocalKeys.bangumiEpInfoPrefix + episode_info.episodeId;
+      var bangumiInfoLs = localStorage.getItem(_bangumi_key);
+      if (bangumiInfoLs) {
+        bangumiInfoLs = JSON.parse(bangumiInfoLs);
+      }
+      var bangumiEpsRes = bangumiInfoLs ? bangumiInfoLs.bangumiEpsRes : null;
+      var subjectId = bangumiInfoLs ? bangumiInfoLs.subjectId : null;
+      var bangumiUrl = bangumiInfoLs ? bangumiInfoLs.bangumiUrl : null;
+      var animeId = episode_info.animeId;
+      if (!subjectId) {
+        if (!animeId) {
+          throw new Error('未获取到 animeId');
+        }
+        var danDanPlayBangumiRes = await fetchJson(dandanplayApi.getBangumi(animeId));
+        episode_info.bgmEpisodeIndex = offsetBgmEpisodeIndex(episode_info.bgmEpisodeIndex, danDanPlayBangumiRes.bangumi);
+        bangumiUrl = danDanPlayBangumiRes.bangumi.bangumiUrl;
+        if (!bangumiUrl) {
+          throw new Error('未请求到 bangumiUrl');
+        }
+        subjectId = parseInt(bangumiUrl.match(/\/(\d+)$/)[1]);
+      }
+      var episodeIndex = episode_info ? episode_info.episodeIndex : null;
+      var bgmEpisodeIndex = episode_info ? episode_info.bgmEpisodeIndex : null;
+      var bangumiInfo = {
+        animeId: animeId,
+        bangumiUrl: bangumiUrl,
+        subjectId: subjectId,
+        episodeIndex: episodeIndex,
+        bgmEpisodeIndex: bgmEpisodeIndex,
+        bangumiEpsRes: bangumiEpsRes,
+        _bangumi_key: _bangumi_key
+      };
+      window.ede.bangumiInfo = bangumiInfo;
+      localStorage.setItem(bangumiInfo._bangumi_key, JSON.stringify(bangumiInfo));
+      return bangumiInfo;
+    }
+
+    /**
+     * 提交 Bangumi 章节收藏状态为「看过」
+     * @param {string} token - Bangumi 个人令牌
+     * @returns {Promise<object>}
+     */
+    async function putBangumiEpStatus(token) {
+      var bangumiInfo = await getEpisodeBangumiRel();
+      var subjectId = bangumiInfo.subjectId,
+        bgmEpisodeIndex = bangumiInfo.bgmEpisodeIndex;
+      var episodeIndex = bgmEpisodeIndex ? bgmEpisodeIndex : bangumiInfo.episodeIndex;
+      console.log('准备校验 Bangumi 条目收藏状态是否为看过');
+      var bangumiMe = localStorage.getItem(lsLocalKeys.bangumiMe);
+      if (bangumiMe) {
+        bangumiMe = JSON.parse(bangumiMe);
+      } else {
+        bangumiMe = await fetchBangumiApiGetMe(token);
+      }
+      var msg = '';
+      var bangumiUserColl = null;
+      try {
+        bangumiUserColl = await fetchJson(bangumiApi.getUserCollection(bangumiMe.username, subjectId), {
+          token: token
+        });
+      } catch (error) {
+        console.warn('Bangumi 条目未收藏');
+      }
+      if (bangumiUserColl && bangumiUserColl.type === 2) {
+        msg = 'Bangumi 条目已为看过状态,跳过更新';
+        console.log(msg, bangumiUserColl);
+        throw new Error(msg);
+      }
+      console.log('准备修改 Bangumi 条目收藏状态为在看, 如果不存在则创建, 如果存在则修改');
+      var body = {
+        type: 3
+      };
+      await fetchJson(bangumiApi.postUserCollection(subjectId), {
+        token: token,
+        body: body
+      });
+      if (!bangumiInfo.bangumiEpsRes) {
+        var fetchUrl = bangumiApi.getUserSubjectEpisodeCollection(subjectId);
+        var bangumiEpsRes = await fetchJson(fetchUrl, {
+          token: token
+        });
+        bangumiInfo.bangumiEpsRes = bangumiEpsRes;
+        var _bangumiEpColl = bangumiEpsRes.data[episodeIndex];
+        if (!_bangumiEpColl) {
+          throw new Error('未匹配到 bangumiEpColl');
+        }
+      }
+      var bangumiEpColl = bangumiInfo.bangumiEpsRes.data[episodeIndex];
+      var bangumiEp = bangumiEpColl.episode;
+      if (bangumiEpColl.type === 2) {
+        msg = 'Bangumi 章节收藏已是看过状态,跳过更新';
+        console.log(msg, bangumiEp);
+        throw new Error(msg);
+      }
+      console.log('准备更新 Bangumi 章节收藏状态, 详情: ', bangumiEp);
+      body.type = 2;
+      await fetchJson(bangumiApi.putUserEpisodeCollection(bangumiEp.id), {
+        token: token,
+        body: body,
+        method: 'PUT'
+      });
+      bangumiEp.type = body.type;
+      console.log("\u6210\u529F\u66F4\u65B0 Bangumi \u7AE0\u8282\u6536\u85CF\u72B6\u6001, \u5728\u770B => \u770B\u8FC7, \u8BE6\u60C5: ", bangumiEp);
+      window.ede.bangumiInfo = bangumiInfo;
+      localStorage.setItem(bangumiInfo._bangumi_key, JSON.stringify(bangumiInfo));
+      return bangumiInfo;
+    }
+
+    /**
+     * 验证 Bangumi Token 并获取用户信息
+     * @param {string} bangumiToken
+     * @returns {Promise<object>}
+     */
+    async function fetchBangumiApiGetMe(bangumiToken) {
+      try {
+        var res = await fetchJson(bangumiApi.getMe(), {
+          token: bangumiToken
+        });
+        console.log('Bangumi Token 验证成功', res);
+        localStorage.setItem(lsLocalKeys.bangumiMe, JSON.stringify(res));
+        return res;
+      } catch (error) {
+        console.error('Bangumi Token 验证失败', error);
+        throw error;
+      }
+    }
+
+    /**
+     * UI 通用组件：图片、链接、图标等
+     * 从 ede.js 迁移，未修改原有实现逻辑
+     */
+
+    /**
+     * 创建 Material Design 图标元素
+     * @param {string} iconKey - 图标键名
+     * @param {string} [extClassName] - 额外类名
+     * @returns {HTMLElement}
+     */
+    function embyI(iconKey, extClassName) {
+      var iNode = document.createElement('i');
+      iNode.className = 'md-icon' + (extClassName ? ' ' + extClassName : '');
+      iNode.style = 'pointer-events: none;';
+      iNode.innerHTML = iconKey;
+      return iNode;
+    }
+
+    /**
+     * 创建图片元素
+     * @param {string} src - 图片地址
+     * @param {string} [style] - 样式
+     * @param {string} [id] - 元素 ID
+     * @param {boolean} [draggable=false] - 是否可拖拽
+     * @returns {HTMLImageElement}
+     */
+    function embyImg(src, style, id) {
+      var draggable = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : false;
+      var img = document.createElement('img');
+      img.id = id;
+      img.src = src;
+      img.style = style;
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.draggable = draggable;
+      img.className = 'coveredImage-noScale cardImage';
+      return img;
+    }
+
+    /**
+     * 创建带图片的按钮
+     * @param {HTMLElement} childNode - 子节点（通常为图片）
+     * @param {string} [btnStyle] - 按钮样式
+     * @returns {HTMLButtonElement}
+     */
+    function embyImgButton(childNode, btnStyle) {
+      var btn = document.createElement('button');
+      btn.style = btnStyle;
+      btn.className = 'cardContent-button cardImageContainer cardPadder-portrait defaultCardBackground';
+      btn.append(childNode);
+      btn.addEventListener('focus', function () {
+        btn.style.boxShadow = '0 0 0 5px green';
+      });
+      btn.addEventListener('blur', function () {
+        btn.style.boxShadow = '';
+      });
+      return btn;
+    }
+
+    /**
+     * Bangumi 角色展示
+     * 从 ede.js buildExtInfo 中拆出，未修改原有实现逻辑
+     */
+
+    /**
+     * 渲染 Bangumi 角色与声优信息
+     * @param {HTMLElement} container - 容器元素
+     * @param {Array} characters - 角色数据数组
+     */
+    function renderBangumiCharacters(container, characters) {
+      characters.map(function (c) {
+        var characterDiv = document.createElement('div');
+        characterDiv.style = 'width: 31%; display: flex; margin: .5em;';
+        var embyImgButtonInner = embyImg(c.images.large, 'object-position: top;');
+        if (!c.images.large) {
+          embyImgButtonInner = embyI(iconKeys.person, classes.cardImageIcon);
+        }
+        characterDiv.append(embyImgButton(embyImgButtonInner));
+        var characterRightDiv = document.createElement('div');
+        characterRightDiv.style.marginLeft = '.5em';
+        var characterNameDiv = document.createElement('div');
+        characterNameDiv.textContent = c.relation + ': ' + c.name;
+        characterRightDiv.append(characterNameDiv);
+        var characterCvDiv = document.createElement('div');
+        characterCvDiv.textContent = 'CV: ' + c.actors.map(function (a) {
+          return a.name;
+        }).join();
+        if (c.actors[0]) {
+          characterCvDiv.append(embyImgButton(embyImg(c.actors[0].images.large)));
+        }
+        characterRightDiv.append(characterCvDiv);
+        characterDiv.append(characterRightDiv);
+        container.append(characterDiv);
+      });
+    }
+
+    /**
+     * 创建 Emby 风格按钮
+     * @param {object} props - { id, label, style, iconKey, ... }
+     * @param {function} [onClick] - 点击回调
+     * @returns {HTMLButtonElement}
+     */
+    function embyButton(props, onClick) {
+      var button = document.createElement('button');
+      button.setAttribute('is', 'emby-button');
+      button.setAttribute('type', 'button');
+      objectEntries(props).forEach(function (_ref) {
+        var _ref2 = _slicedToArray(_ref, 2),
+          key = _ref2[0],
+          value = _ref2[1];
+        if (key !== 'iconKey' && typeof value !== 'function') {
+          button.setAttribute(key, value);
+        }
+      });
+      if (props.iconKey) {
+        button.setAttribute('title', props.label);
+        button.setAttribute('aria-label', props.label);
+        button.innerHTML = embyI(props.iconKey).outerHTML;
+        button.className = classes.embyButtons.iconButton;
+      } else {
+        var _button$classList;
+        (_button$classList = button.classList).add.apply(_button$classList, _toConsumableArray(classes.embyButtons.basic.split(' ')));
+        button.textContent = props.label;
+      }
+      if (typeof onClick === 'function') {
+        button.addEventListener('click', onClick);
+      }
+      return button;
+    }
+
+    /**
+     * 创建 Emby 风格 Tab 切换
+     * @param {Array} options - 选项数组
+     * @param {string|number} selectedValue - 选中值
+     * @param {string|function} optionValueKey - 值键名或取值函数
+     * @param {string|function} optionTitleKey - 标题键名或取值函数
+     * @param {function} [onChange] - 切换回调
+     * @returns {HTMLElement}
+     */
+    function embyTabs(options, selectedValue, optionValueKey, optionTitleKey, onChange) {
+      var tabs = document.createElement('div', {
+        is: 'emby-tabs'
+      });
+      tabs.setAttribute('data-index', '0');
+      tabs.className = classes.embyTabsDiv1;
+      tabs.style.width = 'fit-content';
+      var tabsSlider = document.createElement('div');
+      tabsSlider.className = classes.embyTabsDiv2;
+      tabsSlider.style.padding = '0.25em';
+      options.forEach(function (option, index) {
+        var value = getValueOrInvoke(option, optionValueKey);
+        var title = getValueOrInvoke(option, optionTitleKey);
+        var tabButton = document.createElement('button');
+        tabButton.id = option.id + 'Btn';
+        tabButton.className = "".concat(classes.embyTabsButton).concat(value == selectedValue ? ' emby-tab-button-active' : '');
+        tabButton.setAttribute('data-index', index);
+        tabButton.textContent = title;
+        tabButton.style.display = option.hidden ? 'none' : '';
+        tabsSlider.append(tabButton);
+      });
+      tabs.append(tabsSlider);
+      if (typeof onChange === 'function') {
+        tabs.addEventListener('tabchange', function (e) {
+          return onChange(options[e.detail.selectedTabIndex], e.detail.selectedTabIndex);
+        });
+      }
+      return tabs;
+    }
+
+    /**
+     * 创建滑块
+     * @param {object} opts - { id, labelId, value, min, max, step, orient, lsKey, ... }
+     * @param {function} [onChange] - 变更回调 (value, opts)
+     * @param {function} [onSliding] - 滑动中回调
+     * @returns {HTMLInputElement}
+     */
+    function embySlider() {
+      var opts = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+      var onChange = arguments.length > 1 ? arguments[1] : undefined;
+      var onSliding = arguments.length > 2 ? arguments[2] : undefined;
+      var defaultOpts = {
+        min: 0.1,
+        max: 3,
+        step: 0.1,
+        orient: 'horizontal',
+        'data-bubble': false,
+        'data-hoverthumb': true,
+        style: ''
+      };
+      var options = _objectSpread2(_objectSpread2({}, defaultOpts), opts);
+      var slider = document.createElement('input', {
+        is: 'emby-slider'
+      });
+      slider.setAttribute('type', 'range');
+      if (opts.id) {
+        slider.setAttribute('id', opts.id);
+      }
+      objectEntries(options).forEach(function (_ref2) {
+        var _ref3 = _slicedToArray(_ref2, 2),
+          key = _ref3[0],
+          value = _ref3[1];
+        if (key === 'lsKey') {
+          var optsKeys = Object.keys(opts);
+          if (!optsKeys.includes('value')) {
+            options.value = lsGetItem(value.id);
+          }
+          if (!optsKeys.includes('min')) {
+            slider.setAttribute('min', value.min);
+          }
+          if (!optsKeys.includes('max')) {
+            slider.setAttribute('max', value.max);
+          }
+          if (!optsKeys.includes('step')) {
+            slider.setAttribute('step', value.step);
+          }
+        } else {
+          slider.setAttribute(key, value);
+        }
+      });
+      if (typeof onChange === 'function') {
+        slider.addEventListener('change', function (e) {
+          opts.isManual = e.isManual;
+          var nextEle = e.target.parentNode.nextElementSibling;
+          opts.labelEle = nextEle.children.length > 0 ? nextEle.children[0] : nextEle;
+          return onChange(e.target.value, opts);
+        });
+      }
+      if (typeof onSliding === 'function') {
+        slider.addEventListener('input', function (e) {
+          var nextEle = e.target.parentNode.nextElementSibling;
+          opts.labelEle = nextEle.children.length > 0 ? nextEle.children[0] : nextEle;
+          return onSliding(e.target.value, opts);
+        });
+      }
+      if (options.value || options.value === 0) {
+        slider.setValue(options.value);
+        waitForElement({
+          element: slider,
+          needParent: true
+        }, function (ele) {
+          var e = new Event('change');
+          e.isManual = true;
+          slider.dispatchEvent(e);
+        });
+      }
+      slider.addEventListener('keydown', function (e) {
+        var orient = slider.getAttribute('orient') || 'horizontal';
+        if (orient === 'horizontal' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') || orient === 'vertical' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+          e.stopPropagation();
+        }
+      });
+      return slider;
+    }
+
+    /**
+     * 调用 Emby 原生 dialog 模块
+     * @param {object} opts - { text, title, timeout, html, buttons }
+     * @returns {Promise}
+     */
+    async function embyDialog() {
+      var opts = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+      var defaultOpts = {
+        text: '',
+        title: '',
+        timeout: 0,
+        html: '',
+        buttons: []
+      };
+      opts = _objectSpread2(_objectSpread2({}, defaultOpts), opts);
+      if (typeof require === 'function') {
+        return require(['dialog']).then(function (items) {
+          return items[0](opts);
+        }).catch(function (error) {
+          console.log('点击弹出框外部取消: ' + error);
+        });
+      }
+      return Promise.reject(new Error('Emby require not available'));
+    }
+
+    /**
+     * 关闭当前弹窗
+     */
+    function closeEmbyDialog() {
+      var footerItem = getByClass(classes.formDialogFooterItem);
+      if (footerItem) {
+        footerItem.dispatchEvent(new Event('click'));
+      }
+    }
+
+    /**
+     * 调用 Emby 原生 alert 模块
+     * @param {object} opts - { text, title, timeout, html }
+     * @returns {Promise}
+     */
+    async function embyAlert() {
+      var opts = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+      var defaultOpts = {
+        text: '',
+        title: '',
+        timeout: 0,
+        html: ''
+      };
+      opts = _objectSpread2(_objectSpread2({}, defaultOpts), opts);
+      if (typeof require === 'function') {
+        return require(['alert']).then(function (items) {
+          return items[0](opts);
+        }).catch(function (error) {
+          console.log('点击弹出框外部取消: ' + error);
+        });
+      }
+      return Promise.reject(new Error('Emby require not available'));
+    }
+
+    /**
+     * 调用 Emby 原生 toast 模块
+     * @param {object} opts - { text, secondaryText, icon, iconStrikeThrough }
+     * @returns {Promise}
+     */
+    async function embyToast() {
+      var opts = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+      var defaultOpts = {
+        text: '',
+        secondaryText: '',
+        icon: '',
+        iconStrikeThrough: false
+      };
+      opts = _objectSpread2(_objectSpread2({}, defaultOpts), opts);
+      if (typeof require === 'function') {
+        return require(['toast']).then(function (toast) {
+          return toast(opts);
+        });
+      }
+      return Promise.reject(new Error('Emby require not available'));
+    }
+
+    /**
+     * 创建弹幕设置弹窗
+     * @param {function(HTMLElement): void} [onDialogReady] - 弹窗容器就绪后的回调，用于构建 Tab 内容
+     */
+    function createDialog(onDialogReady) {
+      if (typeof require === 'function') {
+        require(['emby-select', 'emby-checkbox', 'emby-slider', 'emby-textarea', 'emby-collapse', 'emby-button']);
+      }
+      var html = "<div id=\"".concat(eleIds.dialogContainer, "\"></div>");
+      embyDialog({
+        html: html,
+        buttons: [{
+          name: '关闭'
+        }]
+      });
+      if (typeof onDialogReady === 'function') {
+        waitForElement('#' + eleIds.dialogContainer, onDialogReady);
+      }
+    }
+
+    /**
      * EDE 模块化入口（占位）
-     * 阶段 0-2 占位，阶段 3 已引入 match、danmaku
+     * 阶段 0-4 占位，已引入 config、core、utils、match、danmaku、bangumi、ui
      */
     (async function () {
 
@@ -2477,6 +3056,24 @@
           danmakuFilter: danmakuFilter,
           danmakuParser: danmakuParser,
           toastByDanmaku: toastByDanmaku
+        },
+        bangumi: {
+          getEpisodeBangumiRel: getEpisodeBangumiRel,
+          putBangumiEpStatus: putBangumiEpStatus,
+          renderBangumiCharacters: renderBangumiCharacters,
+          fetchBangumiApiGetMe: fetchBangumiApiGetMe
+        },
+        ui: {
+          embyButton: embyButton,
+          embyImg: embyImg,
+          embyImgButton: embyImgButton,
+          embyTabs: embyTabs,
+          embySlider: embySlider,
+          createDialog: createDialog,
+          embyDialog: embyDialog,
+          closeEmbyDialog: closeEmbyDialog,
+          embyAlert: embyAlert,
+          embyToast: embyToast
         }
       });
     })();

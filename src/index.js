@@ -1,6 +1,6 @@
 /**
  * EDE 模块化入口（占位）
- * 阶段 0-2 占位，阶段 3 已引入 match、danmaku
+ * 阶段 0-4 占位，已引入 config、core、utils、match、danmaku、bangumi、ui
  */
 import { check_interval, LOAD_TYPE } from './config/constants.js';
 import { eleIds } from './config/ele-ids.js';
@@ -11,6 +11,15 @@ import { objectEntries, getById, getByClass, waitForElement, fetchJson, OS } fro
 import { lsSetItem, lsBatchSet } from './core/storage.js';
 import { searchEpisodes, fetchSearchEpisodes } from './match/index.js';
 import { createDanmaku, danmakuFilter, danmakuParser, toastByDanmaku } from './danmaku/index.js';
+import { getEpisodeBangumiRel, putBangumiEpStatus, renderBangumiCharacters, fetchBangumiApiGetMe } from './bangumi/index.js';
+import {
+    embyButton,
+    embyImg,
+    embyImgButton,
+    embyTabs,
+    embySlider,
+} from './ui/components/index.js';
+import { createDialog, embyDialog, closeEmbyDialog, embyAlert, embyToast } from './ui/index.js';
 
 (async function () {
     'use strict';
@@ -24,5 +33,7 @@ import { createDanmaku, danmakuFilter, danmakuParser, toastByDanmaku } from './d
         EDE: !!window.ede,
         match: { searchEpisodes, fetchSearchEpisodes },
         danmaku: { createDanmaku, danmakuFilter, danmakuParser, toastByDanmaku },
+        bangumi: { getEpisodeBangumiRel, putBangumiEpStatus, renderBangumiCharacters, fetchBangumiApiGetMe },
+        ui: { embyButton, embyImg, embyImgButton, embyTabs, embySlider, createDialog, embyDialog, closeEmbyDialog, embyAlert, embyToast },
     });
 })();
