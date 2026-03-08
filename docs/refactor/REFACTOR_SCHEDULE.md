@@ -1,6 +1,6 @@
 # ede.js 模块化改造计划编排
 
-> 分支：`refactor/modularization`  
+> 分支：`feature/modular-refactor`  
 > 创建日期：2025-03-08  
 > 状态：待执行
 
@@ -141,7 +141,7 @@
 ## 执行建议
 
 1. **按阶段推进**：每阶段完成后做一次小范围验证，避免问题累积
-2. **分支策略**：在 `refactor/modularization` 下可按阶段建子分支，如 `refactor/phase-1-config`
+2. **分支策略**：在 `feature/modular-refactor` 下可按阶段建子分支，如 `feature/modular-phase-1-config`
 3. **细化任务**：每个任务可再拆为更小的 PR，便于 Code Review
 4. **依赖梳理**：阶段 1 完成后，可用工具（如 madge）检查模块依赖图，及时修正循环依赖
 

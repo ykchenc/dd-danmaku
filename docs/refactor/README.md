@@ -11,7 +11,7 @@
 
 ## 分支
 
-- `refactor/modularization`：模块化改造主分支
+- `feature/modular-refactor`：模块化改造主分支
 
 ## 方案
 

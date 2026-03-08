@@ -1,7 +1,7 @@
 # ede.js 模块化改造方案
 
 > 基于方案 A：ESM + 构建工具  
-> 分支：`refactor/modularization`  
+> 分支：`feature/modular-refactor`  
 > 创建日期：2025-03-08
 
 ---
