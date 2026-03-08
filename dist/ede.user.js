@@ -202,500 +202,6 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
   }
 
   /**
-   * 用户可配置项
-   * 从 ede.js 迁移，未修改原有实现逻辑
-   * note01: 部分 AndroidTV 仅支持最高 ES9 (支持 webview 内核版本 60 以上)
-   * note02: url 禁止使用相对路径,非 web 环境的根路径为文件路径,非 http
-   */
-
-  var requireDanmakuPath = 'https://danmaku.7o7o.cc/danmaku.min.js';
-  var corsProxy = 'https://ddplay-api.7o7o.cc/cors/';
-  function setRequireDanmakuPath(v) {
-    requireDanmakuPath = v;
-  }
-  function setCorsProxy(v) {
-    corsProxy = v;
-  }
-
-  var openSourceLicense = {
-    self: {
-      version: '1.47',
-      name: 'Emby Danmaku Extension(Forked from original:1.11)',
-      license: 'MIT License',
-      url: 'https://github.com/chen3861229/dd-danmaku'
-    },
-    original: {
-      version: '1.11',
-      name: 'Emby Danmaku Extension',
-      license: 'MIT License',
-      url: 'https://github.com/RyoLee/emby-danmaku'
-    },
-    jellyfinFork: {
-      version: '1.52',
-      name: 'Jellyfin Danmaku Extension',
-      license: 'MIT License',
-      url: 'https://github.com/Izumiko/jellyfin-danmaku'
-    },
-    danmaku: {
-      version: '2.0.8',
-      name: 'Danmaku',
-      license: 'MIT License',
-      url: 'https://github.com/weizhenye/Danmaku'
-    },
-    dandanplayApi: {
-      version: 'v2',
-      name: '弹弹 play API',
-      license: 'MIT License',
-      url: 'https://github.com/kaedei/dandanplay-libraryindex'
-    },
-    dandanplayDoc: {
-      version: 'PC',
-      name: '赞助弹弹 play 官方',
-      license: 'None',
-      url: 'https://doc.dandanplay.com/other/donate.html'
-    },
-    bangumiApi: {
-      version: '2025-02-5',
-      name: 'Bangumi API',
-      license: 'None',
-      url: 'https://github.com/bangumi/api'
-    },
-    embyPluginDanmu: {
-      version: '1.0.2',
-      name: 'EmbyPluginDanmu',
-      license: 'None',
-      url: 'https://github.com/fengymi/emby-plugin-danmu'
-    }
-  };
-  var getApiTl = function getApiTl(fn) {
-    if (!fn || typeof fn.toString !== 'function') {
-      return '';
-    }
-    var match = fn.toString().match(/\=>\s*(.*)$/);
-    if (!match || !match[1]) {
-      return '';
-    }
-    return match[1].trim().replace(/`/g, '');
-  };
-
-  // dandanplayApi 需在 lsKeys 之前定义，getter 运行时才需要 lsGetItem/lsKeys
-  var dandanplayApi = {
-    get prefix() {
-      var custom = lsGetItem(lsKeys.customApiPrefix.id);
-      if (custom && custom.length > 0 && !lsGetItem(lsKeys.useOfficialApi.id)) {
-        return custom;
-      }
-      return corsProxy + 'https://api.dandanplay.net/api/v2';
-    },
-    getSearchEpisodes: function getSearchEpisodes(anime, episode, tmdbId) {
-      return "".concat(dandanplayApi.prefix, "/search/episodes?anime=").concat(anime).concat(episode ? "&episode=".concat(episode) : '').concat(tmdbId ? "&tmdbId=".concat(tmdbId) : '');
-    },
-    getComment: function getComment(episodeId, chConvert) {
-      return "".concat(dandanplayApi.prefix, "/comment/").concat(episodeId, "?withRelated=true&chConvert=").concat(chConvert);
-    },
-    getExtcomment: function getExtcomment(url) {
-      return "".concat(dandanplayApi.prefix, "/extcomment?url=").concat(encodeURI(url));
-    },
-    getBangumi: function getBangumi(animeId) {
-      return "".concat(dandanplayApi.prefix, "/bangumi/").concat(animeId);
-    },
-    posterImg: function posterImg(animeId) {
-      return "https://img.dandanplay.net/anime/".concat(animeId, ".jpg");
-    }
-  };
-  var bangumiApi = {
-    prefix: 'https://api.bgm.tv/v0',
-    accessTokenUrl: 'https://next.bgm.tv/demo/access-token',
-    getCharacters: function getCharacters(subjectId) {
-      return "".concat(bangumiApi.prefix, "/subjects/").concat(subjectId, "/characters");
-    },
-    getMe: function getMe() {
-      return "".concat(bangumiApi.prefix, "/me");
-    },
-    getUserCollection: function getUserCollection(userName, subjectId) {
-      return "".concat(bangumiApi.prefix, "/users/").concat(userName, "/collections/").concat(subjectId);
-    },
-    postUserCollection: function postUserCollection(subjectId) {
-      return "".concat(bangumiApi.prefix, "/users/-/collections/").concat(subjectId);
-    },
-    getUserSubjectEpisodeCollection: function getUserSubjectEpisodeCollection(subjectId) {
-      return "".concat(bangumiApi.prefix, "/users/-/collections/").concat(subjectId, "/episodes?offset=0&limit=100");
-    },
-    putUserEpisodeCollection: function putUserEpisodeCollection(episodeId) {
-      return "".concat(bangumiApi.prefix, "/users/-/collections/-/episodes/").concat(episodeId);
-    }
-  };
-
-  // lsKeys 需在 dandanplayApi 之后，因 defaultValue 使用 getApiTl(dandanplayApi.getComment)
-  var lsKeys = {
-    chConvert: {
-      id: 'danmakuChConvert',
-      defaultValue: 1,
-      name: '简繁转换'
-    },
-    switch: {
-      id: 'danmakuSwitch',
-      defaultValue: true,
-      name: '弹幕开关'
-    },
-    filterLevel: {
-      id: 'danmakuFilterLevel',
-      defaultValue: 0,
-      name: '过滤强度',
-      min: 0,
-      max: 3,
-      step: 1
-    },
-    heightPercent: {
-      id: 'danmakuHeightPercent',
-      defaultValue: 100,
-      name: '显示区域',
-      min: 3,
-      max: 100,
-      step: 1
-    },
-    fontSizeRate: {
-      id: 'danmakuFontSizeRate',
-      defaultValue: 1,
-      name: '弹幕大小',
-      min: 0.1,
-      max: 3,
-      step: 0.1
-    },
-    fontOpacity: {
-      id: 'danmakuFontOpacity',
-      defaultValue: 1,
-      name: '透明度',
-      min: 0.1,
-      max: 1,
-      step: 0.1
-    },
-    speed: {
-      id: 'danmakuBaseSpeed',
-      defaultValue: 1,
-      name: '速度',
-      min: 0.1,
-      max: 3,
-      step: 0.1
-    },
-    timelineOffset: {
-      id: 'danmakuTimelineOffset',
-      defaultValue: 0,
-      name: '轴偏秒'
-    },
-    fontWeight: {
-      id: 'danmakuFontWeight',
-      defaultValue: 400,
-      name: '弹幕粗细',
-      min: 100,
-      max: 1000,
-      step: 100
-    },
-    fontStyle: {
-      id: 'danmakuFontStyle',
-      defaultValue: 0,
-      name: '弹幕斜体',
-      min: 0,
-      max: 2,
-      step: 1
-    },
-    fontFamily: {
-      id: 'danmakuFontFamily',
-      defaultValue: 'sans-serif',
-      name: '字体'
-    },
-    danmuList: {
-      id: 'danmakuDanmuList',
-      defaultValue: 0,
-      name: '弹幕列表'
-    },
-    typeFilter: {
-      id: 'danmakuTypeFilter',
-      defaultValue: [],
-      name: '屏蔽类型'
-    },
-    sourceFilter: {
-      id: 'danmakuSourceFilter',
-      defaultValue: [],
-      name: '屏蔽来源平台'
-    },
-    showSource: {
-      id: 'danmakuShowSource',
-      defaultValue: [],
-      name: '显示每条来源'
-    },
-    autoFilterCount: {
-      id: 'danmakuAutoFilterCount',
-      defaultValue: 0,
-      name: '自动过滤弹幕数阈值',
-      min: 0,
-      max: 10000,
-      step: 500
-    },
-    mergeSimilarEnable: {
-      id: 'danmakuMergeSimilarEnable',
-      defaultValue: false,
-      name: '合并相似弹幕'
-    },
-    mergeSimilarPercent: {
-      id: 'danmakuMergeSimilarPercent',
-      defaultValue: 80,
-      name: '相似度百分比',
-      min: 20,
-      max: 100,
-      step: 1
-    },
-    mergeSimilarTime: {
-      id: 'danmakuMergeSimilarTime',
-      defaultValue: 10,
-      name: '相似度时间窗口秒',
-      min: 1,
-      max: 60,
-      step: 1
-    },
-    filterKeywords: {
-      id: 'danmakuFilterKeywords',
-      defaultValue: '',
-      name: '屏蔽关键词'
-    },
-    filterKeywordsEnable: {
-      id: 'danmakuFilterKeywordsEnable',
-      defaultValue: true,
-      name: '屏蔽关键词启用'
-    },
-    engine: {
-      id: 'danmakuEngine',
-      defaultValue: 'canvas',
-      name: '弹幕引擎'
-    },
-    osdTitleEnable: {
-      id: 'danmakuOsdTitleEnable',
-      defaultValue: false,
-      name: '播放界面右下角显示弹幕信息'
-    },
-    osdLineChartEnable: {
-      id: 'danmakuOsdLineChartEnable',
-      defaultValue: false,
-      name: '弹幕高能进度条'
-    },
-    osdLineChartSkipFilter: {
-      id: 'danmakuOsdLineChartSkipFilter',
-      defaultValue: false,
-      name: '弹幕高能进度条免过滤'
-    },
-    osdLineChartTime: {
-      id: 'danmakuOsdLineChartTime',
-      defaultValue: 10,
-      name: '弹幕高能进度条颗粒度秒',
-      min: 1,
-      max: 60,
-      step: 1
-    },
-    osdHeaderClockEnable: {
-      id: 'danmakuOsdHeaderClockEnable',
-      defaultValue: false,
-      name: '播放界面头中显示时钟'
-    },
-    timeoutCallbackUnit: {
-      id: 'danmakuTimeoutCallbackUnit',
-      defaultValue: 1,
-      name: '定时单位'
-    },
-    timeoutCallbackValue: {
-      id: 'danmakuTimeoutCallbackValue',
-      defaultValue: 0,
-      name: '定时值'
-    },
-    bangumiEnable: {
-      id: 'danmakuBangumiEnable',
-      defaultValue: false,
-      name: '启用并填写个人令牌'
-    },
-    bangumiToken: {
-      id: 'danmakuBangumiToken',
-      defaultValue: '',
-      name: '个人令牌'
-    },
-    bangumiPostPercent: {
-      id: 'danmakuBangumiPostPercent',
-      defaultValue: 95,
-      name: '时长比',
-      min: 1,
-      max: 99,
-      step: 1
-    },
-    consoleLogEnable: {
-      id: 'danmakuConsoleLogEnable',
-      defaultValue: false,
-      name: '控制台日志'
-    },
-    useFetchPluginXml: {
-      id: 'danmakuUseFetchPluginXml',
-      defaultValue: false,
-      name: '加载媒体服务端xml弹幕'
-    },
-    debugShowDanmakuWrapper: {
-      id: 'danmakuDebugShowDanmakuWrapper',
-      defaultValue: false,
-      name: '弹幕容器边界'
-    },
-    debugShowDanmakuCtrWrapper: {
-      id: 'danmakuDebugShowDanmakuCtrWrapper',
-      defaultValue: false,
-      name: '按钮容器边界'
-    },
-    debugReverseDanmu: {
-      id: 'danmakuDebugReverseDanmu',
-      defaultValue: false,
-      name: '反转弹幕方向'
-    },
-    debugRandomDanmuColor: {
-      id: 'danmakuDebugRandomDanmuColor',
-      defaultValue: false,
-      name: '随机弹幕颜色'
-    },
-    debugForceDanmuWhite: {
-      id: 'danmakuDebugForceDanmuWhite',
-      defaultValue: false,
-      name: '强制弹幕白色'
-    },
-    debugTopBottomToScroll: {
-      id: 'danmakuDebugTopBottomToScroll',
-      defaultValue: false,
-      name: '顶底弹幕滚动'
-    },
-    debugGenerateLarge: {
-      id: 'danmakuDebugGenerateLarge',
-      defaultValue: false,
-      name: '测试大量弹幕'
-    },
-    debugDialogHyalinize: {
-      id: 'danmakuDebugDialogHyalinize',
-      defaultValue: false,
-      name: '透明弹窗背景'
-    },
-    debugDialogWindow: {
-      id: 'danmakuDebugDialogWindow',
-      defaultValue: false,
-      name: '弹窗窗口化'
-    },
-    debugDialogRight: {
-      id: 'danmakuDebugDialogRight',
-      defaultValue: false,
-      name: '弹窗靠右布局'
-    },
-    debugTabIframeEnable: {
-      id: 'danmakuDebugTabIframeEnable',
-      defaultValue: false,
-      name: '打开内嵌网页'
-    },
-    debugH5VideoAdapterEnable: {
-      id: 'danmakuDebugH5VideoAdapterEnable',
-      defaultValue: false,
-      name: '查看视频适配器情况'
-    },
-    debugDanmuAnywhereEnable: {
-      id: 'danmakuDebugDanmuAnywhereEnable',
-      defaultValue: false,
-      name: '在任意处测试弹幕'
-    },
-    quickDebugOn: {
-      id: 'danmakuQuickDebugOn',
-      defaultValue: false,
-      name: '快速调试'
-    },
-    customeCorsProxyUrl: {
-      id: 'danmakuCustomeCorsProxyUrl',
-      defaultValue: corsProxy,
-      name: '跨域代理前缀'
-    },
-    customeDanmakuUrl: {
-      id: 'danmakuCustomeDanmakuUrl',
-      defaultValue: requireDanmakuPath,
-      name: '弹幕引擎依赖'
-    },
-    customeGetCommentUrl: {
-      id: 'danmakuCustomeGetCommentUrl',
-      defaultValue: getApiTl(dandanplayApi.getComment),
-      name: '获取指定弹幕库的所有弹幕'
-    },
-    customeGetExtcommentUrl: {
-      id: 'danmakuCustomeGetExtcommentUrl',
-      defaultValue: getApiTl(dandanplayApi.getExtcomment),
-      name: '获取指定第三方url的弹幕'
-    },
-    customePosterImgUrl: {
-      id: 'danmakuCustomePosterImgUrl',
-      defaultValue: getApiTl(dandanplayApi.posterImg),
-      name: '媒体海报'
-    },
-    customApiPrefix: {
-      id: 'danmakuCustomApiPrefix',
-      defaultValue: '',
-      name: '自定义弹弹play API地址'
-    },
-    useOfficialApi: {
-      id: 'danmakuUseOfficialApi',
-      defaultValue: true,
-      name: '使用官方API'
-    },
-    useCustomApi: {
-      id: 'danmakuUseCustomApi',
-      defaultValue: false,
-      name: '使用自定义API'
-    },
-    apiPriority: {
-      id: 'danmakuApiPriority',
-      defaultValue: ['official', 'custom'],
-      name: 'API 优先级'
-    }
-  };
-  function lsGetKeyById(id) {
-    return Object.keys(lsKeys).find(function (key) {
-      return lsKeys[key].id === id;
-    });
-  }
-  function lsGetItem(id) {
-    var key = lsGetKeyById(id);
-    if (!key) {
-      return null;
-    }
-    var defaultValue = lsKeys[key].defaultValue;
-    var item = localStorage.getItem(id);
-    if (item === null) {
-      return defaultValue;
-    }
-    if (Array.isArray(defaultValue) || _typeof(defaultValue) === 'object' && defaultValue !== null) {
-      return JSON.parse(item);
-    }
-    if (typeof defaultValue === 'boolean') {
-      return item === 'true';
-    }
-    if (typeof defaultValue === 'number') {
-      return parseFloat(item);
-    }
-    return item;
-  }
-
-  var EDE = /*#__PURE__*/_createClass(function EDE() {
-    _classCallCheck(this, EDE);
-    this.chConvert = lsGetItem(lsKeys.chConvert.id);
-    this.danmaku = null;
-    this.episode_info = null;
-    this.ob = null;
-    this.loading = false;
-    this.danmuCache = {}; // 只包含 comment 未解析
-    this.commentsParsed = []; // 包含 comment 和 extComment 解析后全量
-    this.extCommentCache = {}; // 只包含 extComment 未解析
-    this.destroyIntervalIds = [];
-    this.searchDanmakuOpts = {}; // 手动搜索变量
-    this.appLogAspect = null; // 应用日志切面
-    this.bangumiInfo = {};
-    this.itemId = '';
-    this.tempLsValues = {}; // 临时存储的由程序更改后的 ls 值
-  });
-
-  /**
    * 通用工具函数
    * 从 ede.js 迁移，未修改原有实现逻辑
    */
@@ -1195,6 +701,482 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
     progressBarLineChart: 'progressBarLineChart'
   };
 
+  /**
+   * 用户可配置项
+   * 从 ede.js 迁移，未修改原有实现逻辑
+   * note01: 部分 AndroidTV 仅支持最高 ES9 (支持 webview 内核版本 60 以上)
+   * note02: url 禁止使用相对路径,非 web 环境的根路径为文件路径,非 http
+   */
+
+  var requireDanmakuPath = 'https://danmaku.7o7o.cc/danmaku.min.js';
+  var corsProxy = 'https://ddplay-api.7o7o.cc/cors/';
+  function setRequireDanmakuPath(v) {
+    requireDanmakuPath = v;
+  }
+  function setCorsProxy(v) {
+    corsProxy = v;
+  }
+
+  var openSourceLicense = {
+    self: {
+      version: '1.47',
+      name: 'Emby Danmaku Extension(Forked from original:1.11)',
+      license: 'MIT License',
+      url: 'https://github.com/chen3861229/dd-danmaku'
+    },
+    original: {
+      version: '1.11',
+      name: 'Emby Danmaku Extension',
+      license: 'MIT License',
+      url: 'https://github.com/RyoLee/emby-danmaku'
+    },
+    jellyfinFork: {
+      version: '1.52',
+      name: 'Jellyfin Danmaku Extension',
+      license: 'MIT License',
+      url: 'https://github.com/Izumiko/jellyfin-danmaku'
+    },
+    danmaku: {
+      version: '2.0.8',
+      name: 'Danmaku',
+      license: 'MIT License',
+      url: 'https://github.com/weizhenye/Danmaku'
+    },
+    dandanplayApi: {
+      version: 'v2',
+      name: '弹弹 play API',
+      license: 'MIT License',
+      url: 'https://github.com/kaedei/dandanplay-libraryindex'
+    },
+    dandanplayDoc: {
+      version: 'PC',
+      name: '赞助弹弹 play 官方',
+      license: 'None',
+      url: 'https://doc.dandanplay.com/other/donate.html'
+    },
+    bangumiApi: {
+      version: '2025-02-5',
+      name: 'Bangumi API',
+      license: 'None',
+      url: 'https://github.com/bangumi/api'
+    },
+    embyPluginDanmu: {
+      version: '1.0.2',
+      name: 'EmbyPluginDanmu',
+      license: 'None',
+      url: 'https://github.com/fengymi/emby-plugin-danmu'
+    }
+  };
+  var getApiTl = function getApiTl(fn) {
+    if (!fn || typeof fn.toString !== 'function') {
+      return '';
+    }
+    var match = fn.toString().match(/\=>\s*(.*)$/);
+    if (!match || !match[1]) {
+      return '';
+    }
+    return match[1].trim().replace(/`/g, '');
+  };
+
+  // dandanplayApi 需在 lsKeys 之前定义，getter 运行时才需要 lsGetItem/lsKeys
+  var dandanplayApi = {
+    get prefix() {
+      var custom = lsGetItem(lsKeys.customApiPrefix.id);
+      if (custom && custom.length > 0 && !lsGetItem(lsKeys.useOfficialApi.id)) {
+        return custom;
+      }
+      return corsProxy + 'https://api.dandanplay.net/api/v2';
+    },
+    getSearchEpisodes: function getSearchEpisodes(anime, episode, tmdbId) {
+      return "".concat(dandanplayApi.prefix, "/search/episodes?anime=").concat(anime).concat(episode ? "&episode=".concat(episode) : '').concat(tmdbId ? "&tmdbId=".concat(tmdbId) : '');
+    },
+    getComment: function getComment(episodeId, chConvert) {
+      return "".concat(dandanplayApi.prefix, "/comment/").concat(episodeId, "?withRelated=true&chConvert=").concat(chConvert);
+    },
+    getExtcomment: function getExtcomment(url) {
+      return "".concat(dandanplayApi.prefix, "/extcomment?url=").concat(encodeURI(url));
+    },
+    getBangumi: function getBangumi(animeId) {
+      return "".concat(dandanplayApi.prefix, "/bangumi/").concat(animeId);
+    },
+    posterImg: function posterImg(animeId) {
+      return "https://img.dandanplay.net/anime/".concat(animeId, ".jpg");
+    }
+  };
+  var bangumiApi = {
+    prefix: 'https://api.bgm.tv/v0',
+    accessTokenUrl: 'https://next.bgm.tv/demo/access-token',
+    getCharacters: function getCharacters(subjectId) {
+      return "".concat(bangumiApi.prefix, "/subjects/").concat(subjectId, "/characters");
+    },
+    getMe: function getMe() {
+      return "".concat(bangumiApi.prefix, "/me");
+    },
+    getUserCollection: function getUserCollection(userName, subjectId) {
+      return "".concat(bangumiApi.prefix, "/users/").concat(userName, "/collections/").concat(subjectId);
+    },
+    postUserCollection: function postUserCollection(subjectId) {
+      return "".concat(bangumiApi.prefix, "/users/-/collections/").concat(subjectId);
+    },
+    getUserSubjectEpisodeCollection: function getUserSubjectEpisodeCollection(subjectId) {
+      return "".concat(bangumiApi.prefix, "/users/-/collections/").concat(subjectId, "/episodes?offset=0&limit=100");
+    },
+    putUserEpisodeCollection: function putUserEpisodeCollection(episodeId) {
+      return "".concat(bangumiApi.prefix, "/users/-/collections/-/episodes/").concat(episodeId);
+    }
+  };
+
+  // lsKeys 需在 dandanplayApi 之后，因 defaultValue 使用 getApiTl(dandanplayApi.getComment)
+  var lsKeys = {
+    chConvert: {
+      id: 'danmakuChConvert',
+      defaultValue: 1,
+      name: '简繁转换'
+    },
+    switch: {
+      id: 'danmakuSwitch',
+      defaultValue: true,
+      name: '弹幕开关'
+    },
+    filterLevel: {
+      id: 'danmakuFilterLevel',
+      defaultValue: 0,
+      name: '过滤强度',
+      min: 0,
+      max: 3,
+      step: 1
+    },
+    heightPercent: {
+      id: 'danmakuHeightPercent',
+      defaultValue: 100,
+      name: '显示区域',
+      min: 3,
+      max: 100,
+      step: 1
+    },
+    fontSizeRate: {
+      id: 'danmakuFontSizeRate',
+      defaultValue: 1,
+      name: '弹幕大小',
+      min: 0.1,
+      max: 3,
+      step: 0.1
+    },
+    fontOpacity: {
+      id: 'danmakuFontOpacity',
+      defaultValue: 1,
+      name: '透明度',
+      min: 0.1,
+      max: 1,
+      step: 0.1
+    },
+    speed: {
+      id: 'danmakuBaseSpeed',
+      defaultValue: 1,
+      name: '速度',
+      min: 0.1,
+      max: 3,
+      step: 0.1
+    },
+    timelineOffset: {
+      id: 'danmakuTimelineOffset',
+      defaultValue: 0,
+      name: '轴偏秒'
+    },
+    fontWeight: {
+      id: 'danmakuFontWeight',
+      defaultValue: 400,
+      name: '弹幕粗细',
+      min: 100,
+      max: 1000,
+      step: 100
+    },
+    fontStyle: {
+      id: 'danmakuFontStyle',
+      defaultValue: 0,
+      name: '弹幕斜体',
+      min: 0,
+      max: 2,
+      step: 1
+    },
+    fontFamily: {
+      id: 'danmakuFontFamily',
+      defaultValue: 'sans-serif',
+      name: '字体'
+    },
+    danmuList: {
+      id: 'danmakuDanmuList',
+      defaultValue: 0,
+      name: '弹幕列表'
+    },
+    typeFilter: {
+      id: 'danmakuTypeFilter',
+      defaultValue: [],
+      name: '屏蔽类型'
+    },
+    sourceFilter: {
+      id: 'danmakuSourceFilter',
+      defaultValue: [],
+      name: '屏蔽来源平台'
+    },
+    showSource: {
+      id: 'danmakuShowSource',
+      defaultValue: [],
+      name: '显示每条来源'
+    },
+    autoFilterCount: {
+      id: 'danmakuAutoFilterCount',
+      defaultValue: 0,
+      name: '自动过滤弹幕数阈值',
+      min: 0,
+      max: 10000,
+      step: 500
+    },
+    mergeSimilarEnable: {
+      id: 'danmakuMergeSimilarEnable',
+      defaultValue: false,
+      name: '合并相似弹幕'
+    },
+    mergeSimilarPercent: {
+      id: 'danmakuMergeSimilarPercent',
+      defaultValue: 80,
+      name: '相似度百分比',
+      min: 20,
+      max: 100,
+      step: 1
+    },
+    mergeSimilarTime: {
+      id: 'danmakuMergeSimilarTime',
+      defaultValue: 10,
+      name: '相似度时间窗口秒',
+      min: 1,
+      max: 60,
+      step: 1
+    },
+    filterKeywords: {
+      id: 'danmakuFilterKeywords',
+      defaultValue: '',
+      name: '屏蔽关键词'
+    },
+    filterKeywordsEnable: {
+      id: 'danmakuFilterKeywordsEnable',
+      defaultValue: true,
+      name: '屏蔽关键词启用'
+    },
+    engine: {
+      id: 'danmakuEngine',
+      defaultValue: 'canvas',
+      name: '弹幕引擎'
+    },
+    osdTitleEnable: {
+      id: 'danmakuOsdTitleEnable',
+      defaultValue: false,
+      name: '播放界面右下角显示弹幕信息'
+    },
+    osdLineChartEnable: {
+      id: 'danmakuOsdLineChartEnable',
+      defaultValue: false,
+      name: '弹幕高能进度条'
+    },
+    osdLineChartSkipFilter: {
+      id: 'danmakuOsdLineChartSkipFilter',
+      defaultValue: false,
+      name: '弹幕高能进度条免过滤'
+    },
+    osdLineChartTime: {
+      id: 'danmakuOsdLineChartTime',
+      defaultValue: 10,
+      name: '弹幕高能进度条颗粒度秒',
+      min: 1,
+      max: 60,
+      step: 1
+    },
+    osdHeaderClockEnable: {
+      id: 'danmakuOsdHeaderClockEnable',
+      defaultValue: false,
+      name: '播放界面头中显示时钟'
+    },
+    timeoutCallbackUnit: {
+      id: 'danmakuTimeoutCallbackUnit',
+      defaultValue: 1,
+      name: '定时单位'
+    },
+    timeoutCallbackValue: {
+      id: 'danmakuTimeoutCallbackValue',
+      defaultValue: 0,
+      name: '定时值'
+    },
+    bangumiEnable: {
+      id: 'danmakuBangumiEnable',
+      defaultValue: false,
+      name: '启用并填写个人令牌'
+    },
+    bangumiToken: {
+      id: 'danmakuBangumiToken',
+      defaultValue: '',
+      name: '个人令牌'
+    },
+    bangumiPostPercent: {
+      id: 'danmakuBangumiPostPercent',
+      defaultValue: 95,
+      name: '时长比',
+      min: 1,
+      max: 99,
+      step: 1
+    },
+    consoleLogEnable: {
+      id: 'danmakuConsoleLogEnable',
+      defaultValue: false,
+      name: '控制台日志'
+    },
+    useFetchPluginXml: {
+      id: 'danmakuUseFetchPluginXml',
+      defaultValue: false,
+      name: '加载媒体服务端xml弹幕'
+    },
+    debugShowDanmakuWrapper: {
+      id: 'danmakuDebugShowDanmakuWrapper',
+      defaultValue: false,
+      name: '弹幕容器边界'
+    },
+    debugShowDanmakuCtrWrapper: {
+      id: 'danmakuDebugShowDanmakuCtrWrapper',
+      defaultValue: false,
+      name: '按钮容器边界'
+    },
+    debugReverseDanmu: {
+      id: 'danmakuDebugReverseDanmu',
+      defaultValue: false,
+      name: '反转弹幕方向'
+    },
+    debugRandomDanmuColor: {
+      id: 'danmakuDebugRandomDanmuColor',
+      defaultValue: false,
+      name: '随机弹幕颜色'
+    },
+    debugForceDanmuWhite: {
+      id: 'danmakuDebugForceDanmuWhite',
+      defaultValue: false,
+      name: '强制弹幕白色'
+    },
+    debugTopBottomToScroll: {
+      id: 'danmakuDebugTopBottomToScroll',
+      defaultValue: false,
+      name: '顶底弹幕滚动'
+    },
+    debugGenerateLarge: {
+      id: 'danmakuDebugGenerateLarge',
+      defaultValue: false,
+      name: '测试大量弹幕'
+    },
+    debugDialogHyalinize: {
+      id: 'danmakuDebugDialogHyalinize',
+      defaultValue: false,
+      name: '透明弹窗背景'
+    },
+    debugDialogWindow: {
+      id: 'danmakuDebugDialogWindow',
+      defaultValue: false,
+      name: '弹窗窗口化'
+    },
+    debugDialogRight: {
+      id: 'danmakuDebugDialogRight',
+      defaultValue: false,
+      name: '弹窗靠右布局'
+    },
+    debugTabIframeEnable: {
+      id: 'danmakuDebugTabIframeEnable',
+      defaultValue: false,
+      name: '打开内嵌网页'
+    },
+    debugH5VideoAdapterEnable: {
+      id: 'danmakuDebugH5VideoAdapterEnable',
+      defaultValue: false,
+      name: '查看视频适配器情况'
+    },
+    debugDanmuAnywhereEnable: {
+      id: 'danmakuDebugDanmuAnywhereEnable',
+      defaultValue: false,
+      name: '在任意处测试弹幕'
+    },
+    quickDebugOn: {
+      id: 'danmakuQuickDebugOn',
+      defaultValue: false,
+      name: '快速调试'
+    },
+    customeCorsProxyUrl: {
+      id: 'danmakuCustomeCorsProxyUrl',
+      defaultValue: corsProxy,
+      name: '跨域代理前缀'
+    },
+    customeDanmakuUrl: {
+      id: 'danmakuCustomeDanmakuUrl',
+      defaultValue: requireDanmakuPath,
+      name: '弹幕引擎依赖'
+    },
+    customeGetCommentUrl: {
+      id: 'danmakuCustomeGetCommentUrl',
+      defaultValue: getApiTl(dandanplayApi.getComment),
+      name: '获取指定弹幕库的所有弹幕'
+    },
+    customeGetExtcommentUrl: {
+      id: 'danmakuCustomeGetExtcommentUrl',
+      defaultValue: getApiTl(dandanplayApi.getExtcomment),
+      name: '获取指定第三方url的弹幕'
+    },
+    customePosterImgUrl: {
+      id: 'danmakuCustomePosterImgUrl',
+      defaultValue: getApiTl(dandanplayApi.posterImg),
+      name: '媒体海报'
+    },
+    customApiPrefix: {
+      id: 'danmakuCustomApiPrefix',
+      defaultValue: '',
+      name: '自定义弹弹play API地址'
+    },
+    useOfficialApi: {
+      id: 'danmakuUseOfficialApi',
+      defaultValue: true,
+      name: '使用官方API'
+    },
+    useCustomApi: {
+      id: 'danmakuUseCustomApi',
+      defaultValue: false,
+      name: '使用自定义API'
+    },
+    apiPriority: {
+      id: 'danmakuApiPriority',
+      defaultValue: ['official', 'custom'],
+      name: 'API 优先级'
+    }
+  };
+  function lsGetKeyById(id) {
+    return Object.keys(lsKeys).find(function (key) {
+      return lsKeys[key].id === id;
+    });
+  }
+  function lsGetItem(id) {
+    var key = lsGetKeyById(id);
+    if (!key) {
+      return null;
+    }
+    var defaultValue = lsKeys[key].defaultValue;
+    var item = localStorage.getItem(id);
+    if (item === null) {
+      return defaultValue;
+    }
+    if (Array.isArray(defaultValue) || _typeof(defaultValue) === 'object' && defaultValue !== null) {
+      return JSON.parse(item);
+    }
+    if (typeof defaultValue === 'boolean') {
+      return item === 'true';
+    }
+    if (typeof defaultValue === 'number') {
+      return parseFloat(item);
+    }
+    return item;
+  }
+
   function lsSetItem(id, value) {
     if (!lsGetKeyById(id)) {
       return;
@@ -1258,6 +1240,24 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
       return localStorage.removeItem(key);
     }).length > 0;
   }
+
+  var EDE = /*#__PURE__*/_createClass(function EDE() {
+    _classCallCheck(this, EDE);
+    this.chConvert = lsGetItem(lsKeys.chConvert.id);
+    this.danmaku = null;
+    this.episode_info = null;
+    this.ob = null;
+    this.loading = false;
+    this.danmuCache = {}; // 只包含 comment 未解析
+    this.commentsParsed = []; // 包含 comment 和 extComment 解析后全量
+    this.extCommentCache = {}; // 只包含 extComment 未解析
+    this.destroyIntervalIds = [];
+    this.searchDanmakuOpts = {}; // 手动搜索变量
+    this.appLogAspect = null; // 应用日志切面
+    this.bangumiInfo = {};
+    this.itemId = '';
+    this.tempLsValues = {}; // 临时存储的由程序更改后的 ls 值
+  });
 
   /**
    * 控制台日志切面
@@ -4293,6 +4293,10 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
     if (lsGetItem(lsKeys.osdHeaderClockEnable.id)) {
       addHeaderClock();
     }
+    // 播放界面右下角弹幕信息：OSD 显示时刷新，解决新视频播放时 .videoOsdSecondaryText 尚未渲染导致未展示的问题
+    if (lsGetItem(lsKeys.osdTitleEnable.id)) {
+      appendvideoOsdDanmakuInfo();
+    }
   }
   function onVideoOsdHide(e) {
     console.log(e === null || e === void 0 ? void 0 : e.type, e);
@@ -5988,7 +5992,7 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
     };
     opts = _objectSpread2(_objectSpread2({}, defaultOpts), opts);
     if (typeof require === 'function') {
-      return require(['toast']).then(function (toast) {
+      return require(['toast'], function (toast) {
         return toast(opts);
       });
     }
@@ -6465,10 +6469,10 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
   /**
    * EDE 模块化入口
    * 阶段 0-5，组装 config、core、utils、match、danmaku、bangumi、ui、events
+   * 与原始 ede.js 一致：window.ede 在 onViewShow(video-osd) 时懒初始化，不在此处创建
    */
   (function () {
 
-    window.ede = new EDE();
     refreshEventListener({
       viewshow: onViewShow
     });

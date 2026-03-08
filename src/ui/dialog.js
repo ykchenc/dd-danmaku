@@ -66,7 +66,7 @@ export async function embyToast(opts = {}) {
     const defaultOpts = { text: '', secondaryText: '', icon: '', iconStrikeThrough: false };
     opts = { ...defaultOpts, ...opts };
     if (typeof require === 'function') {
-        return require(['toast']).then((toast) => toast(opts));
+        return require(['toast'], toast => toast(opts));
     }
     return Promise.reject(new Error('Emby require not available'));
 }

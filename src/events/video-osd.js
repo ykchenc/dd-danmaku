@@ -83,6 +83,10 @@ export function onVideoOsdShow(e) {
     if (lsGetItem(lsKeys.osdHeaderClockEnable.id)) {
         addHeaderClock();
     }
+    // 播放界面右下角弹幕信息：OSD 显示时刷新，解决新视频播放时 .videoOsdSecondaryText 尚未渲染导致未展示的问题
+    if (lsGetItem(lsKeys.osdTitleEnable.id)) {
+        appendvideoOsdDanmakuInfo();
+    }
 }
 
 export function onVideoOsdHide(e) {
