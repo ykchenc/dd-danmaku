@@ -4569,7 +4569,7 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
     }));
   }
 
-  var createDanmakuHooks = {
+  var createDanmakuHooks$1 = {
     buildCurrentDanmakuInfo: buildCurrentDanmakuInfo,
     appendvideoOsdDanmakuInfo: appendvideoOsdDanmakuInfo
   };
@@ -4837,7 +4837,7 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
           window.ede.episode_info.episodeId = null;
         }
         if (window.ede.danmaku) {
-          createDanmaku([], createDanmakuHooks);
+          createDanmaku([], createDanmakuHooks$1);
         }
         var label = currentMatchedDiv.querySelector('label');
         if (label) label.textContent = '弹弹 play 总量: 0';
@@ -4866,7 +4866,7 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
         e.target.parentNode.remove();
         createDanmaku(allComments.filter(function (c) {
           return c.fromUrl !== key;
-        }), createDanmakuHooks);
+        }), createDanmakuHooks$1);
       }));
       extUrlDiv.append(embyALink(key), document.createTextNode(" \u603B\u91CF: ".concat(val.length)));
       extUrlsDiv.append(extUrlDiv);
@@ -4897,7 +4897,7 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
       return;
     }
     var allComments = comments.concat(extComments);
-    createDanmaku(allComments, createDanmakuHooks).then(function () {
+    createDanmaku(allComments, createDanmakuHooks$1).then(function () {
       var beforeLength = window.ede.commentsParsed.length - extComments.length;
       embyToast({
         text: "\u6B64\u6B21\u9644\u52A0\u603B\u91CF: ".concat(extComments.length, ", \u9644\u52A0\u524D\u603B\u91CF: ").concat(beforeLength, ", \u9644\u52A0\u540E\u603B\u91CF: ").concat(allComments.length)
@@ -5467,6 +5467,10 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
     buildCustomUrlSetting(container);
   }
 
+  var createDanmakuHooks = {
+    buildCurrentDanmakuInfo: buildCurrentDanmakuInfo,
+    appendvideoOsdDanmakuInfo: appendvideoOsdDanmakuInfo
+  };
   function doConsoleLogChange(checked) {
     lsSetItem(lsKeys.consoleLogEnable.id, checked);
     var consoleLogInfo = getById(eleIds.consoleLogInfo);
@@ -5611,7 +5615,7 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
           });
         });
         console.log('已' + lsKeys.debugReverseDanmu.name);
-        createDanmaku(modified);
+        createDanmaku(modified, createDanmakuHooks);
       }
     }));
     var toggleDanmuColor = function toggleDanmuColor(checked, lsKey, colorFn) {
@@ -5634,7 +5638,7 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
         window.ede.commentsOriginal = comments;
         console.log('已还原' + lsKey.name);
       }
-      createDanmaku(comments);
+      createDanmaku(comments, createDanmakuHooks);
     };
     debugWrapper.append(embyCheckbox({
       id: lsKeys.debugRandomDanmuColor.id,
@@ -5674,7 +5678,7 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
         window.ede.commentsOriginal = comments;
         console.log('已还原' + lsKey.name);
       }
-      createDanmaku(comments);
+      createDanmaku(comments, createDanmakuHooks);
     };
     debugWrapper.append(embyCheckbox({
       id: lsKeys.debugTopBottomToScroll.id,
@@ -5781,7 +5785,7 @@ Emby.importModule(p).then(function(f){window.Danmaku=f;}).catch(function(e){cons
             media.currentTime += 100 / 1e3;
             media.dispatchEvent(new Event('timeupdate'));
           }, 100);
-          createDanmaku(generateRandomDanmu(50000, 600)).then(function () {
+          createDanmaku(generateRandomDanmu(50000, 600), createDanmakuHooks).then(function () {
             return console.log('弹幕就位');
           }).catch(function (err) {
             return console.log(err);
