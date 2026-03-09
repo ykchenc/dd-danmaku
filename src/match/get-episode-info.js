@@ -63,7 +63,6 @@ export async function getEpisodeInfo(is_auto = true, appendvideoOsdDanmakuInfo) 
                     imageUrl: previous_info.imageUrl,
                     seriesOrMovieId,
                     episodeIndex: currentEpisodeNumber - 1,
-                    bgmEpisodeIndex: currentEpisodeNumber - 1,
                 };
             }
         }
@@ -87,7 +86,6 @@ export async function getEpisodeInfo(is_auto = true, appendvideoOsdDanmakuInfo) 
             episodeId: ep.episodeId,
             episodeTitle: ep.episodeTitle,
             episodeIndex,
-            bgmEpisodeIndex: episodeIndex,
             animeId: res.episodeInfo.animeId,
             animeTitle: res.episodeInfo.animeTitle,
             animeOriginalTitle: '',
@@ -120,7 +118,6 @@ export async function getEpisodeInfo(is_auto = true, appendvideoOsdDanmakuInfo) 
         episodeId: ep.episodeId,
         episodeTitle: ep.episodeTitle,
         episodeIndex,
-        bgmEpisodeIndex: res.bgmEpisodeIndex ?? episodeIndex,
         animeId: anime.animeId,
         animeTitle: anime.animeTitle,
         animeOriginalTitle,

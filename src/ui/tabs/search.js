@@ -217,7 +217,6 @@ function doDanmakuSwitchEpisode() {
         episodeId: episodeNumSelect.value,
         episodeTitle: episodeNumSelect.options[episodeNumSelect.selectedIndex].text,
         episodeIndex: episodeNumSelect.selectedIndex,
-        bgmEpisodeIndex: episodeNumSelect.selectedIndex,
         animeId: anime.animeId,
         animeTitle: anime.animeTitle,
         animeOriginalTitle: '',

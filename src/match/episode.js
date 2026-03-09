@@ -127,9 +127,8 @@ export async function searchEpisodes(itemInfoMap) {
 
     const animaRes = await lsSeasonSearchEpisodes(_season_key, episode, selectedApiConfig.prefix);
     if (animaRes?.animaInfo?.animes?.length > 0) {
-        const bgmEpisodeIndex = animaRes.newEpisode - 1;
         console.log(`[自动匹配] 命中赛季缓存，直接使用`);
-        return { animeOriginalTitle: '', animaInfo: animaRes.animaInfo, bgmEpisodeIndex };
+        return { animeOriginalTitle: '', animaInfo: animaRes.animaInfo };
     }
 
     const tmdbMatchResult = await tryMatchByTmdbId(itemInfoMap, apiConfigs, apiPriority);

@@ -8,24 +8,30 @@ import { lsLocalKeys } from '../config/ls-local-keys.js';
 import { fetchJson } from '../utils/fetch.js';
 
 /**
- * 修正 Bangumi 集数索引（番剧非第一季时）
- * @param {number} currentBgmEpisodeIndex
- * @param {object} danDanPlayBangumi
- * @returns {number}
+ * 根据 episodeId 在 bangumi.episodes 中的下标得到 bgmEpisodeIndex（与 Bangumi API data[] 顺序一致）
+ * 优先用 episodeId 精确匹配；否则用 animeId 与 episodeId 的关系（episodeId = animeId*10000+集数）推导正片集数再查找
+ * @param {number} episodeId - 弹弹 play 节目 id
+ * @param {number} animeId - 弹弹 play 番剧 id
+ * @param {object} danDanPlayBangumi - getBangumi(animeId) 返回的 bangumi
+ * @returns {number} 下标，无法解析时返回 -1
  */
-export function offsetBgmEpisodeIndex(currentBgmEpisodeIndex, danDanPlayBangumi) {
-    if (!danDanPlayBangumi) {
-        return currentBgmEpisodeIndex;
+export function resolveBgmEpisodeIndex(episodeId, animeId, danDanPlayBangumi) {
+    if (!danDanPlayBangumi?.episodes?.length) {
+        return -1;
     }
-    let bangumiEp = danDanPlayBangumi.episodes[currentBgmEpisodeIndex];
-    if (!bangumiEp) {
-        console.log(
-            `未匹配到 danDanPlayBangumi 番剧集数,剧集不为第一季,尝试切换接口数据匹配返回修正后的 bgmEpisodeIndex`
-        );
-        return danDanPlayBangumi.episodes.findIndex((ep) => ep.episodeNumber == currentBgmEpisodeIndex + 1);
-    } else {
-        return currentBgmEpisodeIndex;
+    const episodes = danDanPlayBangumi.episodes;
+    let idx = episodes.findIndex((ep) => ep.episodeId === episodeId);
+    if (idx >= 0) {
+        return idx;
     }
+    // 关系：episodeId = animeId * 10000 + 集数；正片 offset 1–8999，特典多为 9xxx
+    const offset = episodeId - animeId * 10000;
+    if (offset >= 1 && offset < 9000) {
+        const epNum = offset;
+        idx = episodes.findIndex((ep) => String(ep.episodeNumber) === String(epNum));
+        if (idx >= 0) return idx;
+    }
+    return -1;
 }
 
 /**
@@ -43,20 +49,28 @@ export async function getEpisodeBangumiRel() {
     let subjectId = bangumiInfoLs ? bangumiInfoLs.subjectId : null;
     let bangumiUrl = bangumiInfoLs ? bangumiInfoLs.bangumiUrl : null;
     const animeId = episode_info.animeId;
-    if (!subjectId) {
+    if (subjectId && bangumiInfoLs?.bgmEpisodeIndex != null) {
+        episode_info.bgmEpisodeIndex = bangumiInfoLs.bgmEpisodeIndex;
+    }
+    if (!subjectId || episode_info.bgmEpisodeIndex == null) {
         if (!animeId) {
             throw new Error('未获取到 animeId');
         }
         const danDanPlayBangumiRes = await fetchJson(dandanplayApi.getBangumi(animeId));
-        episode_info.bgmEpisodeIndex = offsetBgmEpisodeIndex(
-            episode_info.bgmEpisodeIndex,
-            danDanPlayBangumiRes.bangumi
-        );
-        bangumiUrl = danDanPlayBangumiRes.bangumi.bangumiUrl;
-        if (!bangumiUrl) {
-            throw new Error('未请求到 bangumiUrl');
+        const bangumi = danDanPlayBangumiRes.bangumi;
+        const episodeId = episode_info.episodeId;
+        const resolved = resolveBgmEpisodeIndex(episodeId, animeId, bangumi);
+        if (resolved < 0) {
+            throw new Error(`无法从 episodeId=${episodeId} animeId=${animeId} 解析 Bangumi 章节下标`);
         }
-        subjectId = parseInt(bangumiUrl.match(/\/(\d+)$/)[1]);
+        episode_info.bgmEpisodeIndex = resolved;
+        if (!subjectId) {
+            bangumiUrl = bangumi.bangumiUrl;
+            if (!bangumiUrl) {
+                throw new Error('未请求到 bangumiUrl');
+            }
+            subjectId = parseInt(bangumiUrl.match(/\/(\d+)$/)[1]);
+        }
     }
     const episodeIndex = episode_info ? episode_info.episodeIndex : null;
     const bgmEpisodeIndex = episode_info ? episode_info.bgmEpisodeIndex : null;
